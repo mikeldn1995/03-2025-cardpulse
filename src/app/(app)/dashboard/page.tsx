@@ -1,9 +1,11 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, Calendar } from "lucide-react"
+import { AlertTriangle, Calendar, Plus, ChevronDown } from "lucide-react"
 import { useStore } from "@/lib/store"
-import { fmt, utilPercent, utilColor, utilBarColor, getEffectiveAPR, getBalance, getGreeting, cn, ordinal, getMissingMonths } from "@/lib/utils"
+import { useToast } from "@/components/toast"
+import { fmt, utilPercent, utilColor, utilBarColor, getEffectiveAPR, getBalance, getGreeting, cn, ordinal, getMissingMonths, currentMonth } from "@/lib/utils"
 
 function StatCard({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
   return (
@@ -15,18 +17,26 @@ function StatCard({ label, children, full }: { label: string; children: React.Re
 }
 
 export default function DashboardPage() {
-  const { cards, currency, utilThreshold, userName } = useStore()
+  const { cards, currency, utilThreshold, userName, upsertStatement } = useStore()
+  const { toast } = useToast()
   const router = useRouter()
+  const cm = currentMonth()
+
+  const [expenseOpen, setExpenseOpen] = useState(false)
+  const [expenseAmount, setExpenseAmount] = useState("")
+  const [expenseCardId, setExpenseCardId] = useState<number | null>(null)
 
   const totalBal = cards.reduce((s, c) => s + getBalance(c), 0)
   const totalLimit = cards.reduce((s, c) => s + c.limit, 0)
   const totalAvail = totalLimit - totalBal
   const totalUtil = totalLimit > 0 ? (totalBal / totalLimit) * 100 : 0
 
-  // Actual interest from most recent statement per card
-  const totalInterest = cards.reduce((s, c) => {
-    if (c.statements.length === 0) return s
-    return s + c.statements[c.statements.length - 1].interest
+  // Expected interest this month: for each card, estimate based on current balance and effective APR
+  const expectedInterest = cards.reduce((s, c) => {
+    const bal = getBalance(c)
+    if (bal <= 0) return s
+    const apr = getEffectiveAPR(c)
+    return s + bal * (apr / 100 / 12)
   }, 0)
 
   // Weighted average effective APR (weighted by balance)
@@ -56,7 +66,6 @@ export default function DashboardPage() {
     const bal = getBalance(c)
     if (bal <= 0) return false
     const dayDiff = c.paymentDay - currentDay
-    // Due in next 7 days (handles month wrap)
     return (dayDiff >= 0 && dayDiff <= 7) || (dayDiff < 0 && dayDiff + 30 <= 7)
   }).sort((a, b) => {
     const da = (a.paymentDay - currentDay + 30) % 30
@@ -64,11 +73,13 @@ export default function DashboardPage() {
     return da - db
   })
 
-  // Cards with no direct debit set up
   const noDDCards = dueSoon.filter(c => c.dd === "none")
 
-  // Missing statements across all cards
-  const cardsWithMissing = cards.map(c => ({ card: c, missing: getMissingMonths(c) })).filter(x => x.missing.length > 0)
+  // Missing statements across all cards (exclude current month from warnings)
+  const cardsWithMissing = cards.map(c => {
+    const missing = getMissingMonths(c).filter(m => m !== cm)
+    return { card: c, missing }
+  }).filter(x => x.missing.length > 0)
   const totalMissing = cardsWithMissing.reduce((s, x) => s + x.missing.length, 0)
 
   // Top Tip logic
@@ -77,10 +88,71 @@ export default function DashboardPage() {
   const worst = [...cards].sort((a, b) => (utilPercent(b) + getEffectiveAPR(b)) - (utilPercent(a) + getEffectiveAPR(a)))[0]
   const above = cards.filter(c => utilPercent(c) >= utilThreshold).sort((a, b) => utilPercent(b) - utilPercent(a))
 
+  const handleAddExpense = () => {
+    const amount = parseFloat(expenseAmount)
+    if (isNaN(amount) || amount <= 0 || !expenseCardId) return
+    const card = cards.find(c => c.id === expenseCardId)
+    if (!card) return
+
+    const existing = card.statements.find(s => s.month === cm)
+    if (existing) {
+      upsertStatement(card.id, { ...existing, spent: existing.spent + amount })
+    } else {
+      // Create current month statement with estimated interest
+      const bal = getBalance(card)
+      const isPromo = card.aprPromo !== null && card.promoUntil && new Date(card.promoUntil) > new Date(cm + "-28")
+      const apr = isPromo ? card.aprPromo! : card.aprRegular
+      const interest = Math.round(bal * (apr / 100 / 12) * 100) / 100
+      upsertStatement(card.id, { month: cm, spent: amount, paid: 0, interest, source: "manual" })
+    }
+
+    toast(`${fmt(amount, currency)} added to ${card.issuer}`)
+    setExpenseAmount("")
+    setExpenseOpen(false)
+  }
+
   return (
     <>
       <div className="pb-3">
         <p className="text-[0.8125rem] text-muted-foreground">{getGreeting(userName ? userName.split(" ")[0] : "there")}</p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <StatCard label="Total Balance">
+          <div className="text-2xl font-bold tracking-tight mt-1">{fmt(totalBal, currency)}</div>
+        </StatCard>
+        <StatCard label="Available Credit">
+          <div className="text-2xl font-bold tracking-tight mt-1">{fmt(totalAvail, currency)}</div>
+        </StatCard>
+        <StatCard label="Total Utilization">
+          <div className="mt-1.5">
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className={cn("h-full rounded-full transition-all", utilBarColor(totalUtil))} style={{ width: `${Math.min(totalUtil, 100)}%` }} />
+            </div>
+            <div className={`text-lg font-bold tracking-tight mt-1 ${utilColor(totalUtil)}`}>{totalUtil.toFixed(1)}%</div>
+          </div>
+        </StatCard>
+        <StatCard label="Avg Effective APR">
+          <div className="text-2xl font-bold tracking-tight mt-1">
+            {avgAPR.toFixed(1)}%
+          </div>
+          <div className="text-[0.6875rem] text-muted-foreground mt-0.5">weighted by balance</div>
+        </StatCard>
+        <StatCard label="Min Payment Due">
+          <div className="text-2xl font-bold tracking-tight mt-1">{fmt(totalMinPayment, currency)}</div>
+          <div className="text-[0.6875rem] text-muted-foreground mt-0.5">this month</div>
+        </StatCard>
+        <StatCard label="Expected Interest">
+          <div className="text-2xl font-bold tracking-tight mt-1">{fmt(expectedInterest, currency)}</div>
+          <div className="text-[0.6875rem] text-muted-foreground mt-0.5">this month</div>
+        </StatCard>
+        <StatCard label="Highest Utilization" full>
+          <div className="flex items-center justify-between mt-1">
+            <div className={`text-lg font-bold tracking-tight ${utilColor(highUtil)}`}>{highUtil.toFixed(1)}%</div>
+            <div className="text-xs text-muted-foreground">{highCard}</div>
+          </div>
+        </StatCard>
       </div>
 
       {/* Payment due warning */}
@@ -139,42 +211,57 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <StatCard label="Total Balance">
-          <div className="text-2xl font-bold tracking-tight mt-1">{fmt(totalBal, currency)}</div>
-        </StatCard>
-        <StatCard label="Available Credit">
-          <div className="text-2xl font-bold tracking-tight mt-1">{fmt(totalAvail, currency)}</div>
-        </StatCard>
-        <StatCard label="Total Utilization">
-          <div className="mt-1.5">
-            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-              <div className={cn("h-full rounded-full transition-all", utilBarColor(totalUtil))} style={{ width: `${Math.min(totalUtil, 100)}%` }} />
+      {/* Add Expense */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden mb-3">
+        <button
+          onClick={() => setExpenseOpen(!expenseOpen)}
+          className="w-full flex items-center justify-between px-4 py-3 text-[0.8125rem] font-semibold"
+        >
+          <div className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Add Expense
+          </div>
+          <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", expenseOpen && "rotate-180")} />
+        </button>
+        {expenseOpen && (
+          <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+            <div>
+              <label className="block text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Card</label>
+              <select
+                value={expenseCardId ?? ""}
+                onChange={e => setExpenseCardId(e.target.value ? parseInt(e.target.value) : null)}
+                className="w-full h-9 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring"
+              >
+                <option value="">Select a card...</option>
+                {cards.map(c => (
+                  <option key={c.id} value={c.id}>{c.issuer} ••{c.last4}</option>
+                ))}
+              </select>
             </div>
-            <div className={`text-lg font-bold tracking-tight mt-1 ${utilColor(totalUtil)}`}>{totalUtil.toFixed(1)}%</div>
+            <div>
+              <label className="block text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Amount</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={expenseAmount}
+                onChange={e => setExpenseAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full h-9 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring tabular-nums"
+              />
+            </div>
+            <button
+              onClick={handleAddExpense}
+              disabled={!expenseCardId || !expenseAmount || parseFloat(expenseAmount) <= 0}
+              className="w-full h-9 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+            >
+              Add to {cards.find(c => c.id === expenseCardId)?.issuer || "card"}
+            </button>
           </div>
-        </StatCard>
-        <StatCard label="Avg Effective APR">
-          <div className="text-2xl font-bold tracking-tight mt-1">
-            {avgAPR.toFixed(1)}%
-          </div>
-          <div className="text-[0.6875rem] text-muted-foreground mt-0.5">weighted by balance</div>
-        </StatCard>
-        <StatCard label="Min Payment Due">
-          <div className="text-2xl font-bold tracking-tight mt-1">{fmt(totalMinPayment, currency)}</div>
-          <div className="text-[0.6875rem] text-muted-foreground mt-0.5">this month</div>
-        </StatCard>
-        <StatCard label="Last Month Interest">
-          <div className="text-2xl font-bold tracking-tight mt-1">{fmt(totalInterest, currency)}</div>
-        </StatCard>
-        <StatCard label="Highest Utilization" full>
-          <div className="flex items-center justify-between mt-1">
-            <div className={`text-lg font-bold tracking-tight ${utilColor(highUtil)}`}>{highUtil.toFixed(1)}%</div>
-            <div className="text-xs text-muted-foreground">{highCard}</div>
-          </div>
-        </StatCard>
+        )}
       </div>
 
+      {/* Top Tip */}
       {best && worst && (
         <div className="bg-card border border-border rounded-lg p-4">
           <div className="flex items-center gap-2 text-[0.8125rem] font-semibold mb-3">

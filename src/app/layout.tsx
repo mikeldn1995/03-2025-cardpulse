@@ -9,6 +9,13 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "CardPulse — Credit Card Tracker",
   description: "Track your credit cards, stay in control.",
+  manifest: "/manifest.json",
+  themeColor: "#7c3aed",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "CardPulse",
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
