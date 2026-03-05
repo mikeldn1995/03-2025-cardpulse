@@ -117,6 +117,56 @@ export default function DashboardPage() {
         <p className="text-[0.8125rem] text-muted-foreground">{getGreeting(userName ? userName.split(" ")[0] : "there")}</p>
       </div>
 
+      {/* Add Expense */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden mb-3">
+        <button
+          onClick={() => setExpenseOpen(!expenseOpen)}
+          className="w-full flex items-center justify-between px-4 py-3 text-[0.8125rem] font-semibold"
+        >
+          <div className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Add Expense
+          </div>
+          <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", expenseOpen && "rotate-180")} />
+        </button>
+        {expenseOpen && (
+          <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+            <div>
+              <label className="block text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Card</label>
+              <select
+                value={expenseCardId ?? ""}
+                onChange={e => setExpenseCardId(e.target.value ? parseInt(e.target.value) : null)}
+                className="w-full h-9 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring"
+              >
+                <option value="">Select a card...</option>
+                {cards.map(c => (
+                  <option key={c.id} value={c.id}>{c.issuer} ••{c.last4}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Amount</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={expenseAmount}
+                onChange={e => setExpenseAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full h-9 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring tabular-nums"
+              />
+            </div>
+            <button
+              onClick={handleAddExpense}
+              disabled={!expenseCardId || !expenseAmount || parseFloat(expenseAmount) <= 0}
+              className="w-full h-9 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+            >
+              Add to {cards.find(c => c.id === expenseCardId)?.issuer || "card"}
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 mb-3">
         <StatCard label="Total Balance">
@@ -210,56 +260,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-
-      {/* Add Expense */}
-      <div className="bg-card border border-border rounded-lg overflow-hidden mb-3">
-        <button
-          onClick={() => setExpenseOpen(!expenseOpen)}
-          className="w-full flex items-center justify-between px-4 py-3 text-[0.8125rem] font-semibold"
-        >
-          <div className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Add Expense
-          </div>
-          <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", expenseOpen && "rotate-180")} />
-        </button>
-        {expenseOpen && (
-          <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-            <div>
-              <label className="block text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Card</label>
-              <select
-                value={expenseCardId ?? ""}
-                onChange={e => setExpenseCardId(e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full h-9 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring"
-              >
-                <option value="">Select a card...</option>
-                {cards.map(c => (
-                  <option key={c.id} value={c.id}>{c.issuer} ••{c.last4}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Amount</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={expenseAmount}
-                onChange={e => setExpenseAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full h-9 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring tabular-nums"
-              />
-            </div>
-            <button
-              onClick={handleAddExpense}
-              disabled={!expenseCardId || !expenseAmount || parseFloat(expenseAmount) <= 0}
-              className="w-full h-9 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
-            >
-              Add to {cards.find(c => c.id === expenseCardId)?.issuer || "card"}
-            </button>
-          </div>
-        )}
-      </div>
 
       {/* Top Tip */}
       {best && worst && (
