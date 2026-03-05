@@ -2,21 +2,25 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { LogOut, RotateCcw, Moon, Sun, Monitor } from "lucide-react"
+import { LogOut, RotateCcw, Moon, Sun, Monitor, Plus, X } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { useToast } from "@/components/toast"
 import { cn } from "@/lib/utils"
 
 export default function SettingsPage() {
   const {
-    currency, theme, utilThreshold,
-    setCurrency, setTheme, setUtilThreshold,
+    currency, theme, utilThreshold, addresses, userName, userEmail,
+    setCurrency, setTheme, setUtilThreshold, setUserName,
+    addAddress, removeAddress,
     resetCards, logout, cards,
   } = useStore()
   const { toast } = useToast()
   const router = useRouter()
   const [confirmReset, setConfirmReset] = useState(false)
   const [confirmLogout, setConfirmLogout] = useState(false)
+  const [newAddress, setNewAddress] = useState("")
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState(userName)
 
   const handleLogout = () => {
     if (!confirmLogout) { setConfirmLogout(true); return }
@@ -33,9 +37,8 @@ export default function SettingsPage() {
 
   return (
     <>
-      <div className="pb-4">
-        <h2 className="text-xl font-semibold tracking-tight">Settings</h2>
-        <p className="text-[0.8125rem] text-muted-foreground mt-0.5">Preferences and account</p>
+      <div className="pb-3">
+        <p className="text-[0.8125rem] text-muted-foreground">Preferences and account</p>
       </div>
 
       <div className="space-y-3">
@@ -43,11 +46,36 @@ export default function SettingsPage() {
         <Section title="Profile">
           <div className="flex items-center gap-3 py-1">
             <div className="w-10 h-10 rounded-full bg-foreground/10 flex items-center justify-center text-sm font-semibold">
-              D
+              {(userName || userEmail || "?")[0].toUpperCase()}
             </div>
-            <div>
-              <div className="text-sm font-medium">demo@cardpulse.io</div>
-              <div className="text-xs text-muted-foreground">{cards.length} card{cards.length !== 1 ? "s" : ""} linked</div>
+            <div className="flex-1 min-w-0">
+              {editingName ? (
+                <form className="flex items-center gap-1.5" onSubmit={e => {
+                  e.preventDefault()
+                  const trimmed = nameInput.trim()
+                  if (trimmed) { setUserName(trimmed); toast("Name updated") }
+                  setEditingName(false)
+                }}>
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={e => setNameInput(e.target.value)}
+                    autoFocus
+                    className="h-7 w-full px-2 text-sm bg-background border border-ring rounded-md outline-none"
+                  />
+                  <button type="submit" className="text-xs font-medium text-foreground underline shrink-0">Save</button>
+                  <button type="button" onClick={() => { setEditingName(false); setNameInput(userName) }} className="text-xs text-muted-foreground underline shrink-0">Cancel</button>
+                </form>
+              ) : (
+                <div
+                  className="text-sm font-medium cursor-pointer border-b border-dashed border-transparent hover:border-border pb-px"
+                  onClick={() => { setNameInput(userName); setEditingName(true) }}
+                >
+                  {userName || "Set your name"}
+                </div>
+              )}
+              <div className="text-xs text-muted-foreground">{userEmail || "demo@cardpulse.io"}</div>
+              <div className="text-[0.6875rem] text-muted-foreground/60">{cards.length} card{cards.length !== 1 ? "s" : ""} linked</div>
             </div>
           </div>
         </Section>
@@ -126,6 +154,49 @@ export default function SettingsPage() {
           <div className="text-[0.6875rem] text-muted-foreground/80 italic mt-2">
             Demo mode — notifications are simulated
           </div>
+        </Section>
+
+        {/* Saved Addresses */}
+        <Section title="Saved Addresses">
+          <div className="space-y-1.5">
+            {addresses.map(a => (
+              <div key={a} className="flex items-center gap-2 group">
+                <span className="text-sm flex-1 min-w-0 truncate">{a}</span>
+                <button
+                  onClick={() => { removeAddress(a); toast("Address removed") }}
+                  className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-destructive rounded-md opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <form
+            className="flex gap-2 mt-3"
+            onSubmit={e => {
+              e.preventDefault()
+              const trimmed = newAddress.trim()
+              if (trimmed) {
+                addAddress(trimmed)
+                setNewAddress("")
+                toast("Address added")
+              }
+            }}
+          >
+            <input
+              type="text"
+              value={newAddress}
+              onChange={e => setNewAddress(e.target.value)}
+              placeholder="Add new address..."
+              className="flex-1 h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring"
+            />
+            <button
+              type="submit"
+              className="h-8 w-8 flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground rounded-md transition-colors shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </form>
         </Section>
 
         {/* Data */}

@@ -1,22 +1,25 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react"
-import { CreditCard, AppState } from "@/types/card"
-import { SEED_CARDS } from "@/lib/seed-data"
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from "react"
+import { CreditCard, StatementEntry, AppState } from "@/types/card"
 
 const DEFAULT_STATE: AppState = {
   loggedIn: false,
   loginExpiry: null,
-  utilThreshold: 50,
+  userName: "",
+  userEmail: "",
+  utilThreshold: 75,
   currency: "GBP",
   theme: "system",
-  cards: structuredClone(SEED_CARDS),
-  forecastMonthly: 1500,
+  cards: [],
+  forecastMonthly: 200,
+  addresses: [],
 }
 
 interface StoreContextType extends AppState {
-  login: (email: string, password: string, remember: boolean) => boolean
+  loginWithSession: (user: { id: number; email: string; name: string }) => Promise<void>
   logout: () => void
+  setUserName: (name: string) => void
   updateCard: (id: number, updates: Partial<CreditCard>) => void
   deleteCard: (id: number) => void
   setCurrency: (c: AppState["currency"]) => void
@@ -24,6 +27,10 @@ interface StoreContextType extends AppState {
   setUtilThreshold: (n: number) => void
   setForecastMonthly: (n: number) => void
   resetCards: () => void
+  addAddress: (a: string) => void
+  removeAddress: (a: string) => void
+  upsertStatement: (cardId: number, statement: StatementEntry) => void
+  deleteStatement: (cardId: number, month: string) => void
 }
 
 const StoreContext = createContext<StoreContextType | null>(null)
@@ -31,29 +38,73 @@ const StoreContext = createContext<StoreContextType | null>(null)
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(DEFAULT_STATE)
   const [hydrated, setHydrated] = useState(false)
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const stateRef = useRef(state)
+  stateRef.current = state
 
-  // Hydrate from localStorage
+  // Hydrate: check session cookie via API
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("cp_state")
-      if (raw) {
-        const parsed: AppState = JSON.parse(raw)
-        if (parsed.loginExpiry && Date.now() < parsed.loginExpiry) {
-          setState(parsed)
-        } else {
-          localStorage.removeItem("cp_state")
+    async function checkSession() {
+      try {
+        const res = await fetch("/api/auth/session")
+        const data = await res.json()
+        if (data.user) {
+          // Load full state from API
+          const stateRes = await fetch("/api/state")
+          if (stateRes.ok) {
+            const dbState = await stateRes.json()
+            setState({
+              loggedIn: true,
+              loginExpiry: Date.now() + 30 * 24 * 3600000,
+              userName: dbState.userName || data.user.name || "",
+              userEmail: data.user.email,
+              utilThreshold: dbState.utilThreshold ?? 75,
+              currency: dbState.currency ?? "GBP",
+              theme: (dbState.theme ?? "system") as AppState["theme"],
+              cards: dbState.cards || [],
+              forecastMonthly: dbState.forecastMonthly ?? 200,
+              addresses: dbState.addresses || [],
+            })
+          }
         }
-      }
-    } catch {}
-    setHydrated(true)
+      } catch {}
+      setHydrated(true)
+    }
+    checkSession()
   }, [])
 
-  // Persist
+  // Debounced sync to API
+  const syncToApi = useCallback(() => {
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+    syncTimerRef.current = setTimeout(async () => {
+      const s = stateRef.current
+      if (!s.loggedIn) return
+      try {
+        await fetch("/api/state", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userName: s.userName,
+            currency: s.currency,
+            theme: s.theme,
+            utilThreshold: s.utilThreshold,
+            forecastMonthly: s.forecastMonthly,
+            cards: s.cards,
+            addresses: s.addresses,
+          }),
+        })
+      } catch (e) {
+        console.error("Failed to sync state:", e)
+      }
+    }, 1500)
+  }, [])
+
+  // Sync on state changes (after hydration)
   useEffect(() => {
-    if (hydrated) {
-      try { localStorage.setItem("cp_state", JSON.stringify(state)) } catch {}
+    if (hydrated && state.loggedIn) {
+      syncToApi()
     }
-  }, [state, hydrated])
+  }, [state, hydrated, syncToApi])
 
   // Theme
   useEffect(() => {
@@ -65,21 +116,44 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     else if (window.matchMedia("(prefers-color-scheme: dark)").matches) html.classList.add("dark")
   }, [state.theme, hydrated])
 
-  const login = useCallback((email: string, password: string, remember: boolean): boolean => {
-    if (email === "demo@cardpulse.io" && password === "demo1234") {
-      setState(prev => ({
-        ...prev,
-        loggedIn: true,
-        loginExpiry: remember ? Date.now() + 12 * 3600000 : Date.now() + 1800000,
-      }))
-      return true
-    }
-    return false
+  const loginWithSession = useCallback(async (user: { id: number; email: string; name: string }) => {
+    // Session cookie already set by verify-otp, load state from API
+    try {
+      const stateRes = await fetch("/api/state")
+      if (stateRes.ok) {
+        const dbState = await stateRes.json()
+        setState({
+          loggedIn: true,
+          loginExpiry: Date.now() + 30 * 24 * 3600000,
+          userName: user.name || dbState.userName || "",
+          userEmail: user.email,
+          utilThreshold: dbState.utilThreshold ?? 75,
+          currency: dbState.currency ?? "GBP",
+          theme: (dbState.theme ?? "system") as AppState["theme"],
+          cards: dbState.cards || [],
+          forecastMonthly: dbState.forecastMonthly ?? 200,
+          addresses: dbState.addresses || [],
+        })
+        return
+      }
+    } catch {}
+    // Fallback: minimal state
+    setState(prev => ({
+      ...prev,
+      loggedIn: true,
+      loginExpiry: Date.now() + 30 * 24 * 3600000,
+      userName: user.name,
+      userEmail: user.email,
+    }))
   }, [])
 
-  const logout = useCallback(() => {
-    setState({ ...DEFAULT_STATE, cards: structuredClone(SEED_CARDS) })
-    localStorage.removeItem("cp_state")
+  const setUserName = useCallback((userName: string) => {
+    setState(prev => ({ ...prev, userName }))
+  }, [])
+
+  const logout = useCallback(async () => {
+    try { await fetch("/api/auth/logout", { method: "POST" }) } catch {}
+    setState(DEFAULT_STATE)
   }, [])
 
   const updateCard = useCallback((id: number, updates: Partial<CreditCard>) => {
@@ -110,15 +184,49 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const resetCards = useCallback(() => {
-    setState(prev => ({ ...prev, cards: structuredClone(SEED_CARDS) }))
+    setState(prev => ({ ...prev, cards: [] }))
+  }, [])
+
+  const addAddress = useCallback((a: string) => {
+    setState(prev => prev.addresses.includes(a) ? prev : { ...prev, addresses: [...prev.addresses, a] })
+  }, [])
+
+  const removeAddress = useCallback((a: string) => {
+    setState(prev => ({ ...prev, addresses: prev.addresses.filter(x => x !== a) }))
+  }, [])
+
+  const upsertStatement = useCallback((cardId: number, statement: StatementEntry) => {
+    setState(prev => ({
+      ...prev,
+      cards: prev.cards.map(c => {
+        if (c.id !== cardId) return c
+        const existing = c.statements.findIndex(s => s.month === statement.month)
+        const statements = [...c.statements]
+        if (existing >= 0) statements[existing] = statement
+        else statements.push(statement)
+        statements.sort((a, b) => a.month.localeCompare(b.month))
+        return { ...c, statements }
+      }),
+    }))
+  }, [])
+
+  const deleteStatement = useCallback((cardId: number, month: string) => {
+    setState(prev => ({
+      ...prev,
+      cards: prev.cards.map(c => {
+        if (c.id !== cardId) return c
+        return { ...c, statements: c.statements.filter(s => s.month !== month) }
+      }),
+    }))
   }, [])
 
   if (!hydrated) return null
 
   return (
     <StoreContext.Provider value={{
-      ...state, login, logout, updateCard, deleteCard,
+      ...state, loginWithSession, logout, setUserName, updateCard, deleteCard,
       setCurrency, setTheme, setUtilThreshold, setForecastMonthly, resetCards,
+      addAddress, removeAddress, upsertStatement, deleteStatement,
     }}>
       {children}
     </StoreContext.Provider>

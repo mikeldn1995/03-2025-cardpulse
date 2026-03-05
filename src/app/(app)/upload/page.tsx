@@ -4,7 +4,7 @@ import { useState, useRef } from "react"
 import { Upload, FileText, CheckCircle2, Loader2, AlertCircle } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { useToast } from "@/components/toast"
-import { cn } from "@/lib/utils"
+import { cn, getBalance, getEffectiveAPR, currentMonth } from "@/lib/utils"
 
 interface FileItem {
   name: string
@@ -14,7 +14,7 @@ interface FileItem {
 }
 
 export default function UploadPage() {
-  const { cards, updateCard } = useStore()
+  const { cards, upsertStatement } = useStore()
   const { toast } = useToast()
   const [files, setFiles] = useState<FileItem[]>([])
   const [dragOver, setDragOver] = useState(false)
@@ -29,7 +29,6 @@ export default function UploadPage() {
       setFiles(prev => prev.map(f => f.name === file.name ? { ...f, status: "parsing" } : f))
 
       setTimeout(() => {
-        // Simulate parsed result — pick a random card and "update" its balance
         const isPdf = file.name.toLowerCase().endsWith(".pdf")
         if (!isPdf) {
           setFiles(prev => prev.map(f =>
@@ -40,14 +39,18 @@ export default function UploadPage() {
 
         if (cards.length > 0) {
           const card = cards[Math.floor(Math.random() * cards.length)]
-          const newBal = Math.round((card.balance * (0.85 + Math.random() * 0.1)) * 100) / 100
-          updateCard(card.id, { balance: newBal })
+          const month = currentMonth()
+          const spent = Math.round((200 + Math.random() * 500) * 100) / 100
+          const paid = Math.round((100 + Math.random() * 300) * 100) / 100
+          const bal = getBalance(card)
+          const interest = Math.round(bal * (getEffectiveAPR(card) / 100 / 12) * 100) / 100
+          upsertStatement(card.id, { month, spent, paid, interest, source: "upload" })
           setFiles(prev => prev.map(f =>
             f.name === file.name
-              ? { ...f, status: "done", message: `Updated ${card.issuer} •••• ${card.last4} balance` }
+              ? { ...f, status: "done", message: `Updated ${card.issuer} •••• ${card.last4} — ${month} statement` }
               : f
           ))
-          toast(`Parsed: ${card.issuer} updated`)
+          toast(`Parsed: ${card.issuer} statement added`)
         } else {
           setFiles(prev => prev.map(f =>
             f.name === file.name ? { ...f, status: "error", message: "No cards to match" } : f
@@ -78,9 +81,8 @@ export default function UploadPage() {
 
   return (
     <>
-      <div className="pb-4">
-        <h2 className="text-xl font-semibold tracking-tight">Upload</h2>
-        <p className="text-[0.8125rem] text-muted-foreground mt-0.5">Import PDF statements to auto-update balances</p>
+      <div className="pb-3">
+        <p className="text-[0.8125rem] text-muted-foreground">Import PDF statements to auto-update balances</p>
       </div>
 
       {/* Drop zone */}

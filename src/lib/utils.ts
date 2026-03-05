@@ -28,12 +28,49 @@ export function getEffectiveAPR(card: CreditCard): number {
   return card.aprRegular
 }
 
-export function calcInterest(card: CreditCard): number {
-  return card.balance * (getEffectiveAPR(card) / 100 / 12)
+export function getBalance(card: CreditCard): number {
+  return card.statements.reduce(
+    (bal, s) => bal + s.spent - s.paid + s.interest,
+    card.openingBalance
+  )
 }
 
 export function utilPercent(card: CreditCard): number {
-  return card.limit > 0 ? (card.balance / card.limit) * 100 : 0
+  const bal = getBalance(card)
+  return card.limit > 0 ? (bal / card.limit) * 100 : 0
+}
+
+export function currentMonth(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+}
+
+/** Returns all months from the month after openingMonth up to currentMonth */
+export function getExpectedMonths(card: CreditCard): string[] {
+  const cm = currentMonth()
+  const months: string[] = []
+  const [sy, sm] = card.openingMonth.split("-").map(Number)
+  let y = sy, m = sm
+  // Advance one month past opening (first expected statement month)
+  m++
+  if (m > 12) { m = 1; y++ }
+  while (`${y}-${String(m).padStart(2, "0")}` <= cm) {
+    months.push(`${y}-${String(m).padStart(2, "0")}`)
+    m++
+    if (m > 12) { m = 1; y++ }
+  }
+  return months
+}
+
+/** Returns months that should have statements but don't */
+export function getMissingMonths(card: CreditCard): string[] {
+  const expected = getExpectedMonths(card)
+  const have = new Set(card.statements.map(s => s.month))
+  return expected.filter(m => !have.has(m))
+}
+
+export function isMissingRecentStatement(card: CreditCard): boolean {
+  return getMissingMonths(card).length > 0
 }
 
 export function utilColor(pct: number): string {

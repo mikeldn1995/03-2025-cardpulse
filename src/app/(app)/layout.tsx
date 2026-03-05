@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useStore } from "@/lib/store"
 import { BottomNav } from "@/components/bottom-nav"
+import { TopNav } from "@/components/top-nav"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { loggedIn } = useStore()
@@ -17,6 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <TopNav />
       <main className="flex-1 px-4 pb-24 pt-4">
         {children}
       </main>

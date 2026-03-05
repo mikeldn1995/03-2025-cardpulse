@@ -3,11 +3,11 @@
 import { useState, useMemo } from "react"
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, ReferenceLine
 } from "recharts"
 import { useStore } from "@/lib/store"
 import { computeForecast } from "@/lib/forecast"
-import { fmt, cn, currencySymbol } from "@/lib/utils"
+import { fmt, cn, currencySymbol, getBalance } from "@/lib/utils"
 
 type ChartType = "balance" | "interest" | "burn" | "combined" | "stacked" | "summary"
 
@@ -25,7 +25,7 @@ export default function ForecastPage() {
   const [chart, setChart] = useState<ChartType>("balance")
   const [inputVal, setInputVal] = useState(forecastMonthly.toString())
 
-  const totalBal = cards.reduce((s, c) => s + c.balance, 0)
+  const totalBal = cards.reduce((s, c) => s + getBalance(c), 0)
   const fc = useMemo(() => computeForecast(cards, forecastMonthly), [cards, forecastMonthly])
 
   const handleInput = (v: string) => {
@@ -49,6 +49,29 @@ export default function ForecastPage() {
     }))
   }, [fc])
 
+  // Promo expiry markers — find which label index corresponds to each card's promo expiry
+  const promoMarkers = useMemo(() => {
+    if (!fc || data.length === 0) return []
+    const now = new Date()
+    const markers: { label: string; issuer: string }[] = []
+    const seen = new Set<string>()
+
+    cards.forEach(c => {
+      if (c.aprPromo === null || !c.promoUntil) return
+      const expiry = new Date(c.promoUntil)
+      if (expiry <= now) return // already expired
+      // Find how many months from now
+      const monthsAway = (expiry.getFullYear() - now.getFullYear()) * 12 + (expiry.getMonth() - now.getMonth())
+      if (monthsAway < 1 || monthsAway > data.length) return
+      const labelIdx = monthsAway - 1
+      const label = data[labelIdx]?.label
+      if (!label || seen.has(label)) return
+      seen.add(label)
+      markers.push({ label, issuer: c.issuer })
+    })
+    return markers
+  }, [cards, data, fc])
+
   // Determine tick interval for x-axis
   const tickInterval = data.length > 48 ? 11 : data.length > 24 ? 5 : data.length > 12 ? 2 : 0
 
@@ -56,12 +79,23 @@ export default function ForecastPage() {
   const formatY = (v: number) => `${sym}${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toFixed(0)}`
   const tooltipFmt = (v: number) => fmt(v, currency)
 
+  // Shared reference lines for promo expiry
+  const promoLines = promoMarkers.map(m => (
+    <ReferenceLine
+      key={m.label}
+      x={m.label}
+      stroke="hsl(38, 92%, 50%)"
+      strokeDasharray="4 4"
+      strokeWidth={1.5}
+      label={{ value: `${m.issuer} promo ends`, position: "top", fill: "hsl(38, 92%, 50%)", fontSize: 9 }}
+    />
+  ))
+
   if (totalBal <= 0) {
     return (
       <>
-        <div className="pb-4">
-          <h2 className="text-xl font-semibold tracking-tight">Forecast</h2>
-          <p className="text-[0.8125rem] text-muted-foreground mt-0.5">No balances to forecast</p>
+        <div className="pb-3">
+          <p className="text-[0.8125rem] text-muted-foreground">No balances to forecast</p>
         </div>
         <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
           All balances are zero — nothing to project.
@@ -72,9 +106,8 @@ export default function ForecastPage() {
 
   return (
     <>
-      <div className="pb-4">
-        <h2 className="text-xl font-semibold tracking-tight">Forecast</h2>
-        <p className="text-[0.8125rem] text-muted-foreground mt-0.5">Project your repayment timeline</p>
+      <div className="pb-3">
+        <p className="text-[0.8125rem] text-muted-foreground">Project your repayment timeline</p>
       </div>
 
       {/* Monthly payment input */}
@@ -98,6 +131,18 @@ export default function ForecastPage() {
           Total balance: <span className="font-medium text-foreground">{fmt(totalBal, currency)}</span>
         </div>
       </div>
+
+      {/* Promo expiry notice */}
+      {promoMarkers.length > 0 && (
+        <div className="bg-warning/10 border border-warning/20 rounded-lg px-3 py-2 mb-3">
+          <div className="text-[0.6875rem] font-medium text-warning mb-0.5">Promo Rate Expiry</div>
+          {promoMarkers.map(m => (
+            <div key={m.label} className="text-xs text-muted-foreground">
+              {m.issuer} promo ends {m.label} — interest will increase
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Chart tabs */}
       <div className="flex gap-1 overflow-x-auto pb-2 mb-3 -mx-1 px-1 no-scrollbar">
@@ -130,6 +175,7 @@ export default function ForecastPage() {
                   <YAxis tickFormatter={formatY} tick={{ fontSize: 10 }} />
                   <Tooltip formatter={tooltipFmt} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {promoLines}
                   <Line type="monotone" dataKey="customBal" name="Your Plan" stroke="hsl(142, 76%, 36%)" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="minBal" name="Minimum Only" stroke="hsl(0, 84%, 60%)" strokeWidth={2} dot={false} strokeDasharray="5 5" />
                 </LineChart>
@@ -147,6 +193,7 @@ export default function ForecastPage() {
                   <YAxis tickFormatter={formatY} tick={{ fontSize: 10 }} />
                   <Tooltip formatter={tooltipFmt} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {promoLines}
                   <Line type="monotone" dataKey="customInt" name="Your Plan" stroke="hsl(38, 92%, 50%)" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="minInt" name="Minimum Only" stroke="hsl(0, 84%, 60%)" strokeWidth={2} dot={false} strokeDasharray="5 5" />
                 </LineChart>
@@ -164,6 +211,7 @@ export default function ForecastPage() {
                   <YAxis tickFormatter={formatY} tick={{ fontSize: 10 }} />
                   <Tooltip formatter={tooltipFmt} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {promoLines}
                   <Bar dataKey="customMonthlyInt" name="Your Plan" fill="hsl(38, 92%, 50%)" radius={[2, 2, 0, 0]} />
                   <Bar dataKey="minMonthlyInt" name="Minimum Only" fill="hsl(0, 84%, 60%)" radius={[2, 2, 0, 0]} />
                 </BarChart>
@@ -181,6 +229,7 @@ export default function ForecastPage() {
                   <YAxis tickFormatter={formatY} tick={{ fontSize: 10 }} />
                   <Tooltip formatter={tooltipFmt} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {promoLines}
                   <Area type="monotone" dataKey="customBal" name="Balance" fill="hsl(142, 76%, 36%)" fillOpacity={0.15} stroke="hsl(142, 76%, 36%)" strokeWidth={2} />
                   <Line type="monotone" dataKey="customInt" name="Interest Paid" stroke="hsl(38, 92%, 50%)" strokeWidth={2} dot={false} />
                 </ComposedChart>
@@ -198,6 +247,7 @@ export default function ForecastPage() {
                   <YAxis tickFormatter={formatY} tick={{ fontSize: 10 }} />
                   <Tooltip formatter={tooltipFmt} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {promoLines}
                   <Area type="monotone" dataKey="principal" name="Principal Repaid" stackId="1" fill="hsl(142, 76%, 36%)" fillOpacity={0.6} stroke="hsl(142, 76%, 36%)" />
                   <Area type="monotone" dataKey="customMonthlyInt" name="Interest" stackId="1" fill="hsl(0, 84%, 60%)" fillOpacity={0.6} stroke="hsl(0, 84%, 60%)" />
                 </AreaChart>
@@ -215,6 +265,8 @@ export default function ForecastPage() {
                   months={fc.custom.months.length}
                   totalInterest={fc.custom.totalInterests[fc.custom.totalInterests.length - 1] || 0}
                   monthlyPayment={forecastMonthly}
+                  paidOff={fc.custom.paidOff}
+                  remainingBal={fc.custom.totalBals[fc.custom.totalBals.length - 1] || 0}
                   currency={currency}
                 />
                 <SummaryCard
@@ -223,6 +275,8 @@ export default function ForecastPage() {
                   months={fc.minimum.months.length}
                   totalInterest={fc.minimum.totalInterests[fc.minimum.totalInterests.length - 1] || 0}
                   monthlyPayment={null}
+                  paidOff={fc.minimum.paidOff}
+                  remainingBal={fc.minimum.totalBals[fc.minimum.totalBals.length - 1] || 0}
                   currency={currency}
                 />
               </div>
@@ -252,13 +306,15 @@ export default function ForecastPage() {
 }
 
 function SummaryCard({
-  title, accent, months, totalInterest, monthlyPayment, currency,
+  title, accent, months, totalInterest, monthlyPayment, paidOff, remainingBal, currency,
 }: {
   title: string
   accent: "success" | "destructive"
   months: number
   totalInterest: number
   monthlyPayment: number | null
+  paidOff: boolean
+  remainingBal: number
   currency: string
 }) {
   const years = Math.floor(months / 12)
@@ -278,11 +334,19 @@ function SummaryCard({
       <div>
         <div className="text-[0.6875rem] text-muted-foreground">Time to clear</div>
         <div className="text-sm font-semibold">
-          {months >= 360 ? "30+ years" : years > 0 ? `${years}y ${rem}m` : `${months}m`}
+          {paidOff
+            ? (years > 0 ? `${years}y ${rem}m` : `${months}m`)
+            : "Not repaid in 3 years"}
         </div>
       </div>
+      {!paidOff && (
+        <div>
+          <div className="text-[0.6875rem] text-muted-foreground">Remaining at 3y</div>
+          <div className="text-sm font-semibold">{fmt(remainingBal, currency)}</div>
+        </div>
+      )}
       <div>
-        <div className="text-[0.6875rem] text-muted-foreground">Total interest</div>
+        <div className="text-[0.6875rem] text-muted-foreground">Total interest{!paidOff ? " (3y)" : ""}</div>
         <div className="text-sm font-semibold">{fmt(totalInterest, currency)}</div>
       </div>
       {monthlyPayment !== null && (

@@ -1,10 +1,11 @@
 import { CreditCard } from "@/types/card"
-import { getEffectiveAPR } from "@/lib/utils"
+import { getEffectiveAPR, getBalance } from "@/lib/utils"
 
 export interface ForecastResult {
   months: number[]
   totalBals: number[]
   totalInterests: number[]
+  paidOff: boolean
 }
 
 export interface ForecastData {
@@ -18,20 +19,29 @@ export interface ForecastData {
 }
 
 function simulate(cards: CreditCard[], getPayment: (totalBal: number) => number): ForecastResult {
-  const balances = cards.map(c => c.balance)
-  const rates = cards.map(c => getEffectiveAPR(c) / 100 / 12)
+  const balances = cards.map(c => getBalance(c))
+  const regularRates = cards.map(c => c.aprRegular / 100 / 12)
+  const promoRates = cards.map(c => c.aprPromo !== null ? c.aprPromo / 100 / 12 : null)
+  const promoExpiry = cards.map(c => c.promoUntil ? new Date(c.promoUntil) : null)
   const months: number[] = []
   const totalBals: number[] = []
   const totalInterests: number[] = []
   let cumInterest = 0
+  const now = new Date()
 
-  for (let m = 1; m <= 360; m++) {
+  const MAX_MONTHS = 36 // 3-year cap
+  for (let m = 1; m <= MAX_MONTHS; m++) {
     let totalB = balances.reduce((s, b) => s + b, 0)
     if (totalB <= 0) break
 
+    // Calculate the date for this forecast month to check promo expiry
+    const forecastDate = new Date(now.getFullYear(), now.getMonth() + m, 1)
+
     let monthInterest = 0
     for (let i = 0; i < balances.length; i++) {
-      const interest = balances[i] * rates[i]
+      const rate = (promoRates[i] !== null && promoExpiry[i] && forecastDate < promoExpiry[i]!)
+        ? promoRates[i]! : regularRates[i]
+      const interest = balances[i] * rate
       monthInterest += interest
       balances[i] += interest
     }
@@ -54,15 +64,16 @@ function simulate(cards: CreditCard[], getPayment: (totalBal: number) => number)
     if (balances.reduce((s, b) => s + b, 0) <= 0.5) break
   }
 
-  return { months, totalBals, totalInterests }
+  const finalBal = balances.reduce((s, b) => s + b, 0)
+  return { months, totalBals, totalInterests, paidOff: finalBal <= 0.5 }
 }
 
 export function computeForecast(cards: CreditCard[], monthlyPayment: number): ForecastData | null {
-  const totalBal = cards.reduce((s, c) => s + c.balance, 0)
+  const totalBal = cards.reduce((s, c) => s + getBalance(c), 0)
   if (totalBal <= 0) return null
 
   function minPayment(bal: number) {
-    return Math.max(bal * 0.02, Math.min(25, bal))
+    return Math.max(bal * 0.05, Math.min(25, bal))
   }
 
   const custom = simulate(cards, () => monthlyPayment)
@@ -76,13 +87,13 @@ export function computeForecast(cards: CreditCard[], monthlyPayment: number): Fo
     labels.push(d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }))
   }
 
-  // Pad shorter
+  // Pad shorter series with zeros (paid off) and final cumulative interest
   while (custom.totalBals.length < maxLen) {
     custom.totalBals.push(0)
     custom.totalInterests.push(custom.totalInterests[custom.totalInterests.length - 1] || 0)
   }
   while (minimum.totalBals.length < maxLen) {
-    minimum.totalBals.push(minimum.totalBals[minimum.totalBals.length - 1] || 0)
+    minimum.totalBals.push(0)
     minimum.totalInterests.push(minimum.totalInterests[minimum.totalInterests.length - 1] || 0)
   }
 
