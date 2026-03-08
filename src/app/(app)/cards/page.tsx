@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
-import { ChevronDown, Eye, Trash2, AlertTriangle, X, RefreshCw, ArrowUpDown } from "lucide-react"
+import { ChevronDown, Eye, Trash2, AlertTriangle, X, RefreshCw, ArrowUpDown, Wifi } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { useToast } from "@/components/toast"
 import { InlineEdit } from "@/components/ui/inline-edit"
@@ -103,7 +103,9 @@ function StatementRow({ entry, card, currency, isCurrentMonth, onUpdate, onDelet
 
 type SortKey = "default" | "due" | "balance" | "utilization" | "apr"
 
-function CardItem({ card, autoExpand }: { card: CreditCard; autoExpand?: boolean }) {
+interface LiveBal { current: number; available: number; creditLimit: number }
+
+function CardItem({ card, autoExpand, liveBal }: { card: CreditCard; autoExpand?: boolean; liveBal?: LiveBal | null }) {
   const { updateCard, deleteCard, upsertStatement, deleteStatement, currency, addresses } = useStore()
   const { toast } = useToast()
   const [expanded, setExpanded] = useState(autoExpand || false)
@@ -230,8 +232,20 @@ function CardItem({ card, autoExpand }: { card: CreditCard; autoExpand?: boolean
           </div>
         </div>
         <div className="text-right shrink-0">
-          <div className="text-sm font-semibold tabular-nums">{fmt(balance, currency)}</div>
-          <div className="text-[0.6875rem] text-muted-foreground">{fmt(avail, currency)} avail</div>
+          {liveBal ? (
+            <>
+              <div className="text-sm font-semibold tabular-nums flex items-center justify-end gap-1">
+                {fmt(liveBal.current, currency)}
+                <Wifi className="w-2.5 h-2.5 text-success" />
+              </div>
+              <div className="text-[0.6875rem] text-muted-foreground">{fmt(liveBal.available, currency)} avail</div>
+            </>
+          ) : (
+            <>
+              <div className="text-sm font-semibold tabular-nums">{fmt(balance, currency)}</div>
+              <div className="text-[0.6875rem] text-muted-foreground">{fmt(avail, currency)} avail</div>
+            </>
+          )}
         </div>
         <div className="flex gap-1 shrink-0">
           <button onClick={e => { e.stopPropagation(); handleDelete() }}
@@ -551,11 +565,32 @@ function sortCards(cards: CreditCard[], sort: SortKey): CreditCard[] {
   }
 }
 
+interface TLCardData {
+  partialNumber: string
+  displayName: string
+  balance: { current: number; available: number; creditLimit: number } | null
+}
+
 function CardsContent() {
   const { cards } = useStore()
   const searchParams = useSearchParams()
   const highlightId = searchParams.get("highlight") ? parseInt(searchParams.get("highlight")!) : null
   const [sort, setSort] = useState<SortKey>("default")
+  const [tlCards, setTlCards] = useState<TLCardData[]>([])
+
+  useEffect(() => {
+    fetch("/api/truelayer/balances")
+      .then(r => r.json())
+      .then(d => { if (d.connected && d.cards) setTlCards(d.cards) })
+      .catch(() => {})
+  }, [])
+
+  // Match TrueLayer cards to local cards by last 4 digits
+  const liveBalMap = new Map<number, LiveBal>()
+  for (const card of cards) {
+    const match = tlCards.find(tc => tc.partialNumber && tc.partialNumber.endsWith(card.last4))
+    if (match?.balance) liveBalMap.set(card.id, match.balance)
+  }
 
   const sorted = sortCards(cards, sort)
 
@@ -577,7 +612,7 @@ function CardsContent() {
         </div>
       </div>
       <div className="space-y-2">
-        {sorted.map(card => <CardItem key={card.id} card={card} autoExpand={card.id === highlightId} />)}
+        {sorted.map(card => <CardItem key={card.id} card={card} autoExpand={card.id === highlightId} liveBal={liveBalMap.get(card.id)} />)}
       </div>
     </>
   )

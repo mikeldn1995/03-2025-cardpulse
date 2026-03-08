@@ -59,6 +59,15 @@ export const statements = pgTable("statements", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 })
 
+export const truelayerConnections = pgTable("truelayer_connections", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  connectedAt: timestamp("connected_at").notNull().defaultNow(),
+})
+
 export const addresses = pgTable("addresses", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),

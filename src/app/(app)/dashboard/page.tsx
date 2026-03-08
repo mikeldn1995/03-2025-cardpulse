@@ -1,11 +1,24 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, Calendar, Plus, ChevronDown } from "lucide-react"
+import { AlertTriangle, Calendar, Plus, ChevronDown, Wifi } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { useToast } from "@/components/toast"
 import { fmt, utilPercent, utilColor, utilBarColor, getEffectiveAPR, getBalance, getGreeting, cn, ordinal, getMissingMonths, currentMonth } from "@/lib/utils"
+
+interface TLCardBalance {
+  accountId: string
+  displayName: string
+  cardNetwork: string
+  partialNumber: string
+  currency: string
+  balance: {
+    current: number
+    available: number
+    creditLimit: number
+  } | null
+}
 
 function StatCard({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
   return (
@@ -25,6 +38,26 @@ export default function DashboardPage() {
   const [expenseOpen, setExpenseOpen] = useState(false)
   const [expenseAmount, setExpenseAmount] = useState("")
   const [expenseCardId, setExpenseCardId] = useState<number | null>(null)
+
+  // Live balances from TrueLayer
+  const [liveBalances, setLiveBalances] = useState<TLCardBalance[]>([])
+  const [liveConnected, setLiveConnected] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/truelayer/balances")
+      .then(r => r.json())
+      .then(d => {
+        if (d.connected && d.cards) {
+          setLiveConnected(true)
+          setLiveBalances(d.cards)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  // Compute live total balance if connected
+  const liveTotalBal = liveBalances.reduce((s, c) => s + (c.balance?.current ?? 0), 0)
+  const liveTotalLimit = liveBalances.reduce((s, c) => s + (c.balance?.creditLimit ?? 0), 0)
 
   const totalBal = cards.reduce((s, c) => s + getBalance(c), 0)
   const totalLimit = cards.reduce((s, c) => s + c.limit, 0)
@@ -170,10 +203,28 @@ export default function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 mb-3">
         <StatCard label="Total Balance">
-          <div className="text-2xl font-bold tracking-tight mt-1">{fmt(totalBal, currency)}</div>
+          {liveConnected ? (
+            <>
+              <div className="text-2xl font-bold tracking-tight mt-1">{fmt(liveTotalBal, currency)}</div>
+              <div className="flex items-center gap-1 mt-0.5">
+                <Wifi className="w-2.5 h-2.5 text-success" />
+                <span className="text-[0.625rem] text-success font-medium">Live</span>
+              </div>
+            </>
+          ) : (
+            <div className="text-2xl font-bold tracking-tight mt-1">{fmt(totalBal, currency)}</div>
+          )}
         </StatCard>
         <StatCard label="Available Credit">
-          <div className="text-2xl font-bold tracking-tight mt-1">{fmt(totalAvail, currency)}</div>
+          <div className="text-2xl font-bold tracking-tight mt-1">
+            {fmt(liveConnected ? (liveTotalLimit - liveTotalBal) : totalAvail, currency)}
+          </div>
+          {liveConnected && (
+            <div className="flex items-center gap-1 mt-0.5">
+              <Wifi className="w-2.5 h-2.5 text-success" />
+              <span className="text-[0.625rem] text-success font-medium">Live</span>
+            </div>
+          )}
         </StatCard>
         <StatCard label="Total Utilization">
           <div className="mt-1.5">

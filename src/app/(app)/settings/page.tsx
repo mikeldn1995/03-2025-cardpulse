@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { LogOut, RotateCcw, Moon, Sun, Monitor, Plus, X } from "lucide-react"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { LogOut, RotateCcw, Moon, Sun, Monitor, Plus, X, Link, Unlink, Loader2 } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { useToast } from "@/components/toast"
 import { cn } from "@/lib/utils"
@@ -16,11 +16,39 @@ export default function SettingsPage() {
   } = useStore()
   const { toast } = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [confirmReset, setConfirmReset] = useState(false)
   const [confirmLogout, setConfirmLogout] = useState(false)
   const [newAddress, setNewAddress] = useState("")
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState(userName)
+
+  // TrueLayer state
+  const [tlConnected, setTlConnected] = useState<boolean | null>(null)
+  const [tlLoading, setTlLoading] = useState(false)
+
+  useEffect(() => {
+    // Check TrueLayer connection status
+    fetch("/api/truelayer/status").then(r => r.json()).then(d => setTlConnected(d.connected)).catch(() => setTlConnected(false))
+    // Handle callback params
+    if (searchParams.get("tl_connected")) {
+      setTlConnected(true)
+      toast("Bank account connected successfully")
+    }
+    if (searchParams.get("tl_error")) {
+      toast(`Connection failed: ${searchParams.get("tl_error")}`)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleTlDisconnect = async () => {
+    setTlLoading(true)
+    try {
+      await fetch("/api/truelayer/disconnect", { method: "POST" })
+      setTlConnected(false)
+      toast("Bank account disconnected")
+    } catch { toast("Failed to disconnect") }
+    finally { setTlLoading(false) }
+  }
 
   const handleLogout = () => {
     if (!confirmLogout) { setConfirmLogout(true); return }
@@ -78,6 +106,46 @@ export default function SettingsPage() {
               <div className="text-[0.6875rem] text-muted-foreground/60">{cards.length} card{cards.length !== 1 ? "s" : ""} linked</div>
             </div>
           </div>
+        </Section>
+
+        {/* Connected Accounts */}
+        <Section title="Connected Accounts">
+          {tlConnected === null ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-1">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking...
+            </div>
+          ) : tlConnected ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 rounded-full bg-success shrink-0" />
+                <span className="font-medium">Bank connected via TrueLayer</span>
+              </div>
+              <p className="text-[0.6875rem] text-muted-foreground">
+                Live balances are fetched from your bank. You can view them on each card.
+              </p>
+              <button
+                onClick={handleTlDisconnect}
+                disabled={tlLoading}
+                className="flex items-center gap-1.5 text-xs text-destructive hover:underline disabled:opacity-50"
+              >
+                <Unlink className="w-3 h-3" />
+                {tlLoading ? "Disconnecting..." : "Disconnect bank"}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-[0.6875rem] text-muted-foreground">
+                Connect your bank to see live credit card balances directly in CardPulse.
+              </p>
+              <a
+                href="/api/truelayer/connect"
+                className="inline-flex items-center gap-1.5 py-2 px-3 text-xs font-medium bg-foreground text-background rounded-md hover:opacity-90 transition-opacity"
+              >
+                <Link className="w-3 h-3" />
+                Connect bank account
+              </a>
+            </div>
+          )}
         </Section>
 
         {/* Theme */}
