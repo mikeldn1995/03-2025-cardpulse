@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { db } from "@/db"
-import { truelayerConnections } from "@/db/schema"
+import { truelayerConnections, cards } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { getSession } from "@/lib/auth"
 import { fetchCards, fetchCardBalance, refreshAccessToken } from "@/lib/truelayer"
@@ -20,8 +20,8 @@ export async function GET() {
   let conn = connections[0]
   let accessToken = conn.accessToken
 
-  // Refresh token if expired or about to expire (5 min buffer)
-  if (new Date(conn.expiresAt).getTime() - Date.now() < 5 * 60 * 1000) {
+  // Proactively refresh token if within 24 hours of expiry (keeps connection alive for ~90 days)
+  if (new Date(conn.expiresAt).getTime() - Date.now() < 24 * 60 * 60 * 1000) {
     try {
       const tokens = await refreshAccessToken(conn.refreshToken)
       accessToken = tokens.access_token
@@ -31,9 +31,10 @@ export async function GET() {
         expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
       }).where(eq(truelayerConnections.id, conn.id))
     } catch (err: any) {
-      // Refresh failed — connection is stale, remove it
+      // Refresh failed — connection expired, revert connected cards to manual
       await db.delete(truelayerConnections).where(eq(truelayerConnections.id, conn.id))
-      return NextResponse.json({ connected: false, cards: [], error: "Connection expired, please reconnect." })
+      await db.update(cards).set({ source: "manual" }).where(eq(cards.userId, userId))
+      return NextResponse.json({ connected: false, cards: [], expired: true, error: "Bank connection expired. Your cards are now manual. Reconnect anytime in Settings." })
     }
   }
 

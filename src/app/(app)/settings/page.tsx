@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { LogOut, RotateCcw, Moon, Sun, Monitor, Link, Unlink, Loader2, Plus, CreditCard, Wifi } from "lucide-react"
+import { LogOut, RotateCcw, Moon, Sun, Monitor, Unlink, Loader2, Plus, CreditCard, Wifi, Link, AlertTriangle } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { useToast } from "@/components/toast"
 import { cn, currencySymbol } from "@/lib/utils"
@@ -25,11 +25,11 @@ export default function SettingsPage() {
   // TrueLayer state
   const [tlConnected, setTlConnected] = useState<boolean | null>(null)
   const [tlLoading, setTlLoading] = useState(false)
+  const [tlError, setTlError] = useState<string | null>(null)
 
-  // Add card wizard state
-  const [wizardOpen, setWizardOpen] = useState(false)
-  const [wizardStep, setWizardStep] = useState<"type" | "tl-select" | "manual" | "configure">("type")
-  const [wizardType, setWizardType] = useState<"truelayer" | "manual">("manual")
+  // Add card flow state
+  const [flowOpen, setFlowOpen] = useState(false)
+  const [flowStep, setFlowStep] = useState<"idle" | "tl-error" | "tl-select" | "manual">("idle")
   const [tlDiscoveredCards, setTlDiscoveredCards] = useState<any[]>([])
   const [selectedTlCard, setSelectedTlCard] = useState<any>(null)
 
@@ -45,13 +45,25 @@ export default function SettingsPage() {
   const [formDDAmount, setFormDDAmount] = useState("")
 
   useEffect(() => {
-    fetch("/api/truelayer/status").then(r => r.json()).then(d => setTlConnected(d.connected)).catch(() => setTlConnected(false))
+    fetch("/api/truelayer/status")
+      .then(r => r.json())
+      .then(d => setTlConnected(d.connected))
+      .catch(() => setTlConnected(false))
+
     if (searchParams.get("tl_connected")) {
       setTlConnected(true)
-      toast("Bank account connected successfully")
+      toast("Bank connected")
+      fetch("/api/truelayer/status")
+        .then(r => r.json())
+        .then(d => setTlConnected(d.connected))
+        .catch(() => {})
     }
-    if (searchParams.get("tl_error")) {
-      toast(`Connection failed: ${searchParams.get("tl_error")}`)
+
+    const tlErrorParam = searchParams.get("tl_error")
+    if (tlErrorParam) {
+      setTlError(tlErrorParam)
+      setFlowOpen(true)
+      setFlowStep("tl-error")
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -78,23 +90,29 @@ export default function SettingsPage() {
     toast("All cards removed")
   }
 
-  const startWizard = (type: "truelayer" | "manual") => {
-    setWizardType(type)
-    if (type === "truelayer") {
-      fetch("/api/truelayer/balances")
-        .then(r => r.json())
-        .then(d => {
-          if (d.connected && d.cards) {
-            const existingLast4s = new Set(cards.filter(c => c.source === "truelayer").map(c => c.last4))
-            const available = d.cards.filter((tc: any) => !existingLast4s.has(tc.partialNumber?.slice(-4) || ""))
-            setTlDiscoveredCards(available)
-            setWizardStep("tl-select")
-          }
-        })
-        .catch(() => toast("Failed to fetch bank cards"))
+  const handleAddNewCard = () => {
+    setFlowOpen(true)
+    if (tlConnected) {
+      // Already connected -- show choice between import and manual
+      setFlowStep("idle")
     } else {
-      setWizardStep("manual")
+      // Not connected -- try TrueLayer first
+      window.location.href = "/api/truelayer/connect"
     }
+  }
+
+  const handleImportFromBank = () => {
+    fetch("/api/truelayer/balances")
+      .then(r => r.json())
+      .then(d => {
+        if (d.connected && d.cards) {
+          const existingLast4s = new Set(cards.filter(c => c.source === "truelayer").map(c => c.last4))
+          const available = d.cards.filter((tc: any) => !existingLast4s.has(tc.partialNumber?.slice(-4) || ""))
+          setTlDiscoveredCards(available)
+          setFlowStep("tl-select")
+        }
+      })
+      .catch(() => toast("Failed to fetch bank cards"))
   }
 
   const selectTlCard = (tc: any) => {
@@ -103,7 +121,7 @@ export default function SettingsPage() {
     setFormLast4(tc.partialNumber?.slice(-4) || "0000")
     setFormLimit(tc.balance?.creditLimit?.toString() || "")
     setFormBalance(tc.balance?.current?.toString() || "0")
-    setWizardStep("configure")
+    setFlowStep("manual")
   }
 
   const handleSaveCard = () => {
@@ -124,20 +142,23 @@ export default function SettingsPage() {
       ddAmount: parseFloat(formDDAmount) || 0,
       paymentDay: parseInt(formPaymentDay) || 5,
       statementDay: parseInt(formStatementDay) || 1,
-      source: wizardType,
+      source: selectedTlCard ? "truelayer" : "manual",
       tlAccountId: selectedTlCard?.accountId || null,
+      minPaymentOverride: null,
       monthlyRecords: [],
     }
 
     addCard(newCard)
     toast(`${issuer} added`)
-    resetWizard()
+    resetFlow()
   }
 
-  const resetWizard = () => {
-    setWizardOpen(false)
-    setWizardStep("type")
+  const resetFlow = () => {
+    setFlowOpen(false)
+    setFlowStep("idle")
+    setTlError(null)
     setSelectedTlCard(null)
+    setTlDiscoveredCards([])
     setFormIssuer("")
     setFormLast4("")
     setFormLimit("")
@@ -194,44 +215,98 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        {/* Add Card Wizard */}
-        <Section title="Add Card">
-          {!wizardOpen ? (
-            <button
-              onClick={() => setWizardOpen(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium bg-foreground text-background rounded-md hover:opacity-90 transition-opacity"
-            >
-              <Plus className="w-4 h-4" />
-              Add a new card
-            </button>
-          ) : wizardStep === "type" ? (
+        {/* Cards & Banking */}
+        <Section title="Cards & Banking">
+          {/* Bank connection status */}
+          <div className="flex items-center gap-2 text-sm mb-3">
+            {tlConnected === null ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                <span className="text-muted-foreground">Checking bank connection...</span>
+              </>
+            ) : (
+              <>
+                <div className={cn("w-2 h-2 rounded-full shrink-0", tlConnected ? "bg-success" : "bg-muted-foreground/40")} />
+                <span className="font-medium">{tlConnected ? "Bank connected" : "No bank connected"}</span>
+              </>
+            )}
+          </div>
+
+          {!flowOpen ? (
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground mb-3">How would you like to add this card?</p>
+              <button
+                onClick={handleAddNewCard}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium bg-foreground text-background rounded-md hover:opacity-90 transition-opacity"
+              >
+                <Plus className="w-4 h-4" />
+                Add a new card
+              </button>
               {tlConnected && (
                 <button
-                  onClick={() => startWizard("truelayer")}
-                  className="w-full flex items-center gap-3 py-3 px-3 text-sm font-medium bg-success/10 border border-success/20 rounded-md hover:bg-success/15 transition-colors"
+                  onClick={handleTlDisconnect}
+                  disabled={tlLoading}
+                  className="flex items-center gap-1.5 text-xs text-destructive hover:underline disabled:opacity-50 mt-1"
                 >
-                  <Wifi className="w-4 h-4 text-success" />
-                  <div className="text-left">
-                    <div>Import from bank</div>
-                    <div className="text-[0.6875rem] text-muted-foreground font-normal">Auto-fills from your connected account</div>
-                  </div>
+                  <Unlink className="w-3 h-3" />
+                  {tlLoading ? "Disconnecting..." : "Disconnect bank"}
                 </button>
               )}
+            </div>
+          ) : flowStep === "tl-error" ? (
+            /* TrueLayer connection failed */
+            <div className="space-y-3">
+              <div className="flex items-start gap-2.5 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-destructive">Bank connection failed</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{tlError || "An unknown error occurred"}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <a
+                  href="/api/truelayer/connect"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium bg-foreground text-background rounded-md hover:opacity-90 transition-opacity"
+                >
+                  <Link className="w-3.5 h-3.5" />
+                  Try again
+                </a>
+                <button
+                  onClick={() => { setTlError(null); setFlowStep("manual") }}
+                  className="flex-1 py-2.5 text-sm font-medium border border-border rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                >
+                  Add card manually instead
+                </button>
+              </div>
+              <button onClick={resetFlow} className="w-full text-xs text-muted-foreground underline">Cancel</button>
+            </div>
+          ) : flowStep === "idle" && tlConnected ? (
+            /* Connected: choose import or manual */
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground mb-3">How would you like to add this card?</p>
               <button
-                onClick={() => startWizard("manual")}
+                onClick={handleImportFromBank}
+                className="w-full flex items-center gap-3 py-3 px-3 text-sm font-medium bg-success/10 border border-success/20 rounded-md hover:bg-success/15 transition-colors"
+              >
+                <Wifi className="w-4 h-4 text-success" />
+                <div className="text-left">
+                  <div>Import from bank</div>
+                  <div className="text-[0.6875rem] text-muted-foreground font-normal">Auto-fills from your connected account</div>
+                </div>
+              </button>
+              <button
+                onClick={() => setFlowStep("manual")}
                 className="w-full flex items-center gap-3 py-3 px-3 text-sm font-medium bg-secondary border border-border rounded-md hover:bg-accent transition-colors"
               >
                 <CreditCard className="w-4 h-4" />
                 <div className="text-left">
-                  <div>Enter manually</div>
+                  <div>Add manually</div>
                   <div className="text-[0.6875rem] text-muted-foreground font-normal">For cards not in your connected bank</div>
                 </div>
               </button>
-              <button onClick={resetWizard} className="w-full text-xs text-muted-foreground mt-1 underline">Cancel</button>
+              <button onClick={resetFlow} className="w-full text-xs text-muted-foreground mt-1 underline">Cancel</button>
             </div>
-          ) : wizardStep === "tl-select" ? (
+          ) : flowStep === "tl-select" ? (
+            /* Pick a discovered card from bank */
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground mb-2">Select a card from your bank:</p>
               {tlDiscoveredCards.length === 0 ? (
@@ -246,17 +321,21 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2">
                       <Wifi className="w-3 h-3 text-success" />
                       <span className="font-medium">{tc.displayName || tc.cardNetwork}</span>
-                      <span className="text-xs text-muted-foreground font-mono">••{tc.partialNumber?.slice(-4)}</span>
+                      <span className="text-xs text-muted-foreground font-mono">--{tc.partialNumber?.slice(-4)}</span>
                     </div>
                   </button>
                 ))
               )}
-              <button onClick={() => setWizardStep("type")} className="w-full text-xs text-muted-foreground mt-1 underline">Back</button>
+              <div className="flex gap-2 mt-1">
+                <button onClick={() => setFlowStep("idle")} className="text-xs text-muted-foreground underline">Back</button>
+                <button onClick={() => setFlowStep("manual")} className="text-xs text-muted-foreground underline">Add manually instead</button>
+              </div>
             </div>
-          ) : (wizardStep === "manual" || wizardStep === "configure") ? (
+          ) : flowStep === "manual" ? (
+            /* Manual card form */
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground mb-1">
-                {wizardStep === "configure" ? "Fill in the remaining details:" : "Enter card details:"}
+                {selectedTlCard ? "Fill in the remaining details:" : "Enter card details:"}
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <div className="col-span-2">
@@ -274,13 +353,11 @@ export default function SettingsPage() {
                   <input type="number" value={formLimit} onChange={e => setFormLimit(e.target.value)} placeholder="0"
                     className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
                 </div>
-                {wizardStep === "manual" && (
-                  <div>
-                    <FieldLabel>Current Balance</FieldLabel>
-                    <input type="number" value={formBalance} onChange={e => setFormBalance(e.target.value)} placeholder="0"
-                      className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
-                  </div>
-                )}
+                <div>
+                  <FieldLabel>Current Balance</FieldLabel>
+                  <input type="number" value={formBalance} onChange={e => setFormBalance(e.target.value)} placeholder="0"
+                    className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
+                </div>
                 <div>
                   <FieldLabel>APR (%)</FieldLabel>
                   <input type="number" step="0.1" value={formAPR} onChange={e => setFormAPR(e.target.value)} placeholder="0"
@@ -319,51 +396,23 @@ export default function SettingsPage() {
                   className="flex-1 h-9 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity">
                   Save Card
                 </button>
-                <button onClick={resetWizard}
+                <button onClick={resetFlow}
                   className="h-9 px-4 text-sm text-muted-foreground border border-border rounded-md hover:bg-accent transition-colors">
                   Cancel
                 </button>
               </div>
             </div>
-          ) : null}
-        </Section>
-
-        {/* Connected Accounts */}
-        <Section title="Connected Accounts">
-          {tlConnected === null ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-1">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking...
-            </div>
-          ) : tlConnected ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-success shrink-0" />
-                <span className="font-medium">Bank connected via TrueLayer</span>
-              </div>
-              <p className="text-[0.6875rem] text-muted-foreground">
-                Live balances are fetched from your bank. Connected cards update automatically.
-              </p>
-              <button
-                onClick={handleTlDisconnect}
-                disabled={tlLoading}
-                className="flex items-center gap-1.5 text-xs text-destructive hover:underline disabled:opacity-50"
-              >
-                <Unlink className="w-3 h-3" />
-                {tlLoading ? "Disconnecting..." : "Disconnect bank"}
-              </button>
-            </div>
           ) : (
+            /* flowStep === "idle" && not connected -- shouldn't normally render (redirect happens), fallback */
             <div className="space-y-2">
-              <p className="text-[0.6875rem] text-muted-foreground">
-                Connect your bank to see live credit card balances and auto-import cards.
-              </p>
-              <a
-                href="/api/truelayer/connect"
-                className="inline-flex items-center gap-1.5 py-2 px-3 text-xs font-medium bg-foreground text-background rounded-md hover:opacity-90 transition-opacity"
+              <button
+                onClick={() => setFlowStep("manual")}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium bg-secondary border border-border rounded-md hover:bg-accent transition-colors"
               >
-                <Link className="w-3 h-3" />
-                Connect bank account
-              </a>
+                <CreditCard className="w-4 h-4" />
+                Skip -- add manually
+              </button>
+              <button onClick={resetFlow} className="w-full text-xs text-muted-foreground underline">Cancel</button>
             </div>
           )}
         </Section>
@@ -474,7 +523,7 @@ export default function SettingsPage() {
 
         {/* Version */}
         <div className="text-center text-[0.625rem] text-muted-foreground/60 pt-2 pb-20">
-          CardPulse v2.0.0
+          CardPulse v3.0.0
         </div>
       </div>
     </>

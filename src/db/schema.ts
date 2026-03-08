@@ -46,6 +46,7 @@ export const cards = pgTable("cards", {
   statementDay: integer("statement_day").notNull().default(1),
   source: text("source").notNull().default("manual"), // "truelayer" | "manual"
   tlAccountId: text("tl_account_id"), // TrueLayer account ID
+  minPaymentOverride: real("min_payment_override"), // user override for min payment
   createdAt: timestamp("created_at").notNull().defaultNow(),
 })
 

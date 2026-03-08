@@ -167,3 +167,42 @@ export function getIssuerColor(issuer: string): { bg: string; text: string; bord
   const key = issuer.toLowerCase().trim()
   return ISSUER_COLORS[key] || DEFAULT_ISSUER_COLOR
 }
+
+/** Calculate minimum payment: max(5% of balance, £25) or user override */
+export function calcMinPayment(card: CreditCard, balance?: number): number {
+  const bal = balance ?? getBalance(card)
+  if (bal <= 0) return 0
+  if (card.minPaymentOverride !== null && card.minPaymentOverride !== undefined) return card.minPaymentOverride
+  if (card.dd === "full") return bal
+  if (card.dd === "custom") return card.ddAmount
+  return Math.max(bal * 0.05, Math.min(25, bal))
+}
+
+/** Check if a card needs attention (for sorting and dashboard alerts) */
+export function needsAttention(card: CreditCard, utilThreshold: number, liveBal?: { current: number; creditLimit: number }): string[] {
+  const alerts: string[] = []
+  const bal = liveBal ? liveBal.current : getBalance(card)
+  const limit = liveBal ? liveBal.creditLimit : card.limit
+  const util = limit > 0 ? (bal / limit) * 100 : 0
+
+  if (util >= utilThreshold) alerts.push("high-util")
+
+  if (card.source === "manual") {
+    const missing = getMissingMonths(card)
+    if (missing.filter(m => m !== currentMonth()).length > 0) alerts.push("missing-records")
+  }
+
+  if (card.dd === "none" && bal > 0) alerts.push("no-dd")
+
+  const currentDay = new Date().getDate()
+  const dayDiff = (card.paymentDay - currentDay + 30) % 30
+  if (bal > 0 && dayDiff <= 7) alerts.push("payment-due")
+
+  if (card.aprPromo !== null && card.promoUntil) {
+    const expiry = new Date(card.promoUntil)
+    const daysToExpiry = (expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    if (daysToExpiry > 0 && daysToExpiry <= 30) alerts.push("promo-expiring")
+  }
+
+  return alerts
+}

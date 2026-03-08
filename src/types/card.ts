@@ -23,6 +23,7 @@ export interface CreditCard {
   statementDay: number // 1-28, day the statement cycle closes
   source: "truelayer" | "manual" // how this card was added
   tlAccountId: string | null // TrueLayer account ID for connected cards
+  minPaymentOverride: number | null // user override for min payment calculation
   monthlyRecords: MonthlyRecord[]
 }
 

@@ -30,8 +30,8 @@ export async function POST(req: Request) {
   for (const conn of connections) {
     let accessToken = conn.accessToken
 
-    // Refresh token if needed
-    if (new Date(conn.expiresAt).getTime() - Date.now() < 5 * 60 * 1000) {
+    // Proactively refresh token if within 24h of expiry
+    if (new Date(conn.expiresAt).getTime() - Date.now() < 24 * 60 * 60 * 1000) {
       try {
         const tokens = await refreshAccessToken(conn.refreshToken)
         accessToken = tokens.access_token
@@ -41,8 +41,10 @@ export async function POST(req: Request) {
           expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
         }).where(eq(truelayerConnections.id, conn.id))
       } catch {
-        // Token expired, skip this connection
-        results.push({ userId: conn.userId, error: "token_expired" })
+        // Token expired — revert cards to manual, remove connection
+        await db.delete(truelayerConnections).where(eq(truelayerConnections.id, conn.id))
+        await db.update(cards).set({ source: "manual" }).where(eq(cards.userId, conn.userId))
+        results.push({ userId: conn.userId, error: "token_expired_reverted" })
         continue
       }
     }

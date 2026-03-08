@@ -33,6 +33,7 @@ export async function GET() {
         statementDay: card.statementDay,
         source: card.source,
         tlAccountId: card.tlAccountId,
+        minPaymentOverride: card.minPaymentOverride ?? null,
         monthlyRecords: records.map((r) => ({
           month: r.month,
           debits: r.debits,
@@ -108,6 +109,7 @@ export async function PUT(req: Request) {
           statementDay: card.statementDay ?? 1,
           source: card.source ?? "manual",
           tlAccountId: card.tlAccountId ?? null,
+          minPaymentOverride: card.minPaymentOverride ?? null,
         }).where(eq(cards.id, card.id))
 
         // Replace monthly records
@@ -141,6 +143,7 @@ export async function PUT(req: Request) {
           statementDay: card.statementDay || 1,
           source: card.source || "manual",
           tlAccountId: card.tlAccountId || null,
+          minPaymentOverride: card.minPaymentOverride ?? null,
         }).returning()
 
         for (const r of card.monthlyRecords || []) {

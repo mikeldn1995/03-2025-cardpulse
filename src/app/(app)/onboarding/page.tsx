@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Wifi, CreditCard, ArrowRight, Check } from "lucide-react"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Wifi, ArrowRight, Check, AlertTriangle } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { useToast } from "@/components/toast"
-import { cn, currencySymbol } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { CreditCard as CreditCardType } from "@/types/card"
 
 type Step = "welcome" | "profile" | "add-card" | "done"
@@ -14,8 +14,17 @@ export default function OnboardingPage() {
   const { userName, currency, setUserName, setCurrency, setOnboarded, addCard } = useStore()
   const { toast } = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  const [step, setStep] = useState<Step>("welcome")
+  const tlError = searchParams.get("tl_error")
+  const tlConnected = searchParams.get("tl_connected")
+
+  const [step, setStep] = useState<Step>(() => {
+    if (tlConnected === "1") return "done"
+    if (tlError) return "add-card"
+    return "welcome"
+  })
+
   const [nameInput, setNameInput] = useState(userName)
   const [selectedCurrency, setSelectedCurrency] = useState(currency)
 
@@ -25,6 +34,10 @@ export default function OnboardingPage() {
   const [formLimit, setFormLimit] = useState("")
   const [formBalance, setFormBalance] = useState("")
   const [formAPR, setFormAPR] = useState("")
+  const [showManualForm, setShowManualForm] = useState(false)
+
+  // If TrueLayer connected successfully, show done with success context
+  const [connectedViaBank, setConnectedViaBank] = useState(tlConnected === "1")
 
   const handleProfileNext = () => {
     const trimmed = nameInput.trim()
@@ -53,6 +66,7 @@ export default function OnboardingPage() {
       statementDay: 1,
       source: "manual",
       tlAccountId: null,
+      minPaymentOverride: null,
       monthlyRecords: [],
     }
 
@@ -64,10 +78,6 @@ export default function OnboardingPage() {
   const handleFinish = () => {
     setOnboarded(true)
     router.push("/dashboard")
-  }
-
-  const handleSkipToFinish = () => {
-    setStep("done")
   }
 
   return (
@@ -151,7 +161,30 @@ export default function OnboardingPage() {
             <p className="text-sm text-muted-foreground mt-1">Connect your bank or enter card details manually.</p>
           </div>
 
-          <div className="space-y-2">
+          {tlError && (
+            <div className="flex items-start gap-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm">
+              <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+              <div className="space-y-2">
+                <p className="text-foreground">{tlError}</p>
+                <div className="flex gap-3">
+                  <a
+                    href="/api/truelayer/connect"
+                    className="text-xs font-medium underline text-foreground"
+                  >
+                    Try again
+                  </a>
+                  <button
+                    onClick={() => setShowManualForm(true)}
+                    className="text-xs font-medium underline text-muted-foreground"
+                  >
+                    Skip to manual
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
             <a
               href="/api/truelayer/connect"
               className="w-full flex items-center gap-3 py-3 px-4 text-sm font-medium bg-success/10 border border-success/20 rounded-lg hover:bg-success/15 transition-colors"
@@ -163,47 +196,57 @@ export default function OnboardingPage() {
               </div>
             </a>
 
-            <div className="text-center text-xs text-muted-foreground py-1">or add manually</div>
-
-            <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="col-span-2">
-                  <FieldLabel>Card Issuer</FieldLabel>
-                  <input type="text" value={formIssuer} onChange={e => setFormIssuer(e.target.value)} placeholder="e.g. Barclaycard"
-                    className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
-                </div>
-                <div>
-                  <FieldLabel>Last 4 Digits</FieldLabel>
-                  <input type="text" value={formLast4} onChange={e => setFormLast4(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1234" maxLength={4}
-                    className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring font-mono" />
-                </div>
-                <div>
-                  <FieldLabel>Credit Limit</FieldLabel>
-                  <input type="number" value={formLimit} onChange={e => setFormLimit(e.target.value)} placeholder="0"
-                    className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
-                </div>
-                <div>
-                  <FieldLabel>Current Balance</FieldLabel>
-                  <input type="number" value={formBalance} onChange={e => setFormBalance(e.target.value)} placeholder="0"
-                    className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
-                </div>
-                <div>
-                  <FieldLabel>APR (%)</FieldLabel>
-                  <input type="number" step="0.1" value={formAPR} onChange={e => setFormAPR(e.target.value)} placeholder="0"
-                    className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
-                </div>
-              </div>
+            {!showManualForm ? (
               <button
-                onClick={handleAddManualCard}
-                className="w-full h-9 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+                onClick={() => setShowManualForm(true)}
+                className="w-full text-xs text-muted-foreground underline py-1"
               >
-                Add Card
+                or add a card manually
               </button>
-            </div>
+            ) : (
+              <>
+                <div className="text-center text-xs text-muted-foreground py-1">or add manually</div>
+                <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2">
+                      <FieldLabel>Card Issuer</FieldLabel>
+                      <input type="text" value={formIssuer} onChange={e => setFormIssuer(e.target.value)} placeholder="e.g. Barclaycard"
+                        className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
+                    </div>
+                    <div>
+                      <FieldLabel>Last 4 Digits</FieldLabel>
+                      <input type="text" value={formLast4} onChange={e => setFormLast4(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1234" maxLength={4}
+                        className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring font-mono" />
+                    </div>
+                    <div>
+                      <FieldLabel>Credit Limit</FieldLabel>
+                      <input type="number" value={formLimit} onChange={e => setFormLimit(e.target.value)} placeholder="0"
+                        className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
+                    </div>
+                    <div>
+                      <FieldLabel>Current Balance</FieldLabel>
+                      <input type="number" value={formBalance} onChange={e => setFormBalance(e.target.value)} placeholder="0"
+                        className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
+                    </div>
+                    <div>
+                      <FieldLabel>APR (%)</FieldLabel>
+                      <input type="number" step="0.1" value={formAPR} onChange={e => setFormAPR(e.target.value)} placeholder="0"
+                        className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleAddManualCard}
+                    className="w-full h-9 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+                  >
+                    Add Card
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
-          <button onClick={handleSkipToFinish} className="w-full text-xs text-muted-foreground underline">
-            Skip — I'll add cards later
+          <button onClick={() => setStep("done")} className="w-full text-xs text-muted-foreground underline">
+            Skip -- I'll add cards later
           </button>
         </div>
       )}
@@ -216,7 +259,10 @@ export default function OnboardingPage() {
           <div>
             <h2 className="text-xl font-bold tracking-tight">You're all set!</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              You can always add more cards and connect your bank in Settings.
+              {connectedViaBank
+                ? "Your bank account has been connected. Cards will sync automatically."
+                : "You can always add more cards and connect your bank in Settings."
+              }
             </p>
           </div>
           <button
