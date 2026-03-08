@@ -1,28 +1,29 @@
-export interface StatementEntry {
-  month: string // "YYYY-MM" — calendar month this statement covers
-  spent: number
-  paid: number
-  interest: number
-  source: "manual" | "upload"
+export interface MonthlyRecord {
+  month: string // "YYYY-MM" — the statement period this record covers
+  debits: number // total spending (charges to the card)
+  credits: number // total payments (paid off the card)
+  interest: number // auto-derived from balance delta, or APR-based estimate
+  closingBalance: number // actual balance at end of period (TrueLayer snapshot or computed)
+  source: "truelayer" | "manual"
 }
 
 export interface CreditCard {
   id: number
   issuer: string
   last4: string
-  fullNumber: string
-  openingBalance: number // balance before any tracked statements
-  openingMonth: string // "YYYY-MM" — the month the opening balance is as of (statements expected from month after)
+  openingBalance: number // balance before any tracked records
+  openingMonth: string // "YYYY-MM" — the month the opening balance is as of
   limit: number
   aprRegular: number
   aprPromo: number | null
   promoUntil: string | null // ISO date string
-  dd: "minimum" | "custom" | "none"
+  dd: "minimum" | "custom" | "full" | "none"
   ddAmount: number
-  address: string
   paymentDay: number // 1-28
   statementDay: number // 1-28, day the statement cycle closes
-  statements: StatementEntry[]
+  source: "truelayer" | "manual" // how this card was added
+  tlAccountId: string | null // TrueLayer account ID for connected cards
+  monthlyRecords: MonthlyRecord[]
 }
 
 export interface AppState {
@@ -35,5 +36,5 @@ export interface AppState {
   theme: "system" | "light" | "dark"
   cards: CreditCard[]
   forecastMonthly: number
-  addresses: string[]
+  onboarded: boolean
 }

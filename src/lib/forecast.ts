@@ -18,27 +18,43 @@ export interface ForecastData {
   customPrincipal: number[]
 }
 
+/** Get average monthly debits and credits from recent records (up to 3 months) */
+function getAverages(card: CreditCard): { avgDebits: number; avgCredits: number } {
+  const sorted = [...card.monthlyRecords].sort((a, b) => b.month.localeCompare(a.month))
+  const recent = sorted.slice(0, 3)
+  if (recent.length === 0) return { avgDebits: 0, avgCredits: 0 }
+  const avgDebits = recent.reduce((s, r) => s + r.debits, 0) / recent.length
+  const avgCredits = recent.reduce((s, r) => s + r.credits, 0) / recent.length
+  return { avgDebits, avgCredits }
+}
+
 function simulate(cards: CreditCard[], getPayment: (totalBal: number) => number): ForecastResult {
   const balances = cards.map(c => getBalance(c))
   const regularRates = cards.map(c => c.aprRegular / 100 / 12)
   const promoRates = cards.map(c => c.aprPromo !== null ? c.aprPromo / 100 / 12 : null)
   const promoExpiry = cards.map(c => c.promoUntil ? new Date(c.promoUntil) : null)
+  const averages = cards.map(c => getAverages(c))
   const months: number[] = []
   const totalBals: number[] = []
   const totalInterests: number[] = []
   let cumInterest = 0
   const now = new Date()
 
-  const MAX_MONTHS = 36 // 3-year cap
+  const MAX_MONTHS = 36
   for (let m = 1; m <= MAX_MONTHS; m++) {
     let totalB = balances.reduce((s, b) => s + b, 0)
     if (totalB <= 0) break
 
-    // Calculate the date for this forecast month to check promo expiry
     const forecastDate = new Date(now.getFullYear(), now.getMonth() + m, 1)
 
     let monthInterest = 0
     for (let i = 0; i < balances.length; i++) {
+      if (balances[i] <= 0) continue
+
+      // Add projected spending (debits increase balance)
+      balances[i] += averages[i].avgDebits
+
+      // Calculate interest using APR
       const rate = (promoRates[i] !== null && promoExpiry[i] && forecastDate < promoExpiry[i]!)
         ? promoRates[i]! : regularRates[i]
       const interest = balances[i] * rate
@@ -46,11 +62,13 @@ function simulate(cards: CreditCard[], getPayment: (totalBal: number) => number)
       balances[i] += interest
     }
 
+    // Apply payments
     const payment = getPayment(totalB)
-    const currentTotal = balances.reduce((s, b) => s + b, 0)
+    const currentTotal = balances.reduce((s, b) => s + Math.max(0, b), 0)
     const remaining = Math.min(payment, currentTotal)
 
     for (let i = 0; i < balances.length; i++) {
+      if (balances[i] <= 0) continue
       const share = currentTotal > 0 ? balances[i] / currentTotal : 0
       const pay = Math.min(remaining * share, balances[i])
       balances[i] -= pay
@@ -87,7 +105,6 @@ export function computeForecast(cards: CreditCard[], monthlyPayment: number): Fo
     labels.push(d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }))
   }
 
-  // Pad shorter series with zeros (paid off) and final cumulative interest
   while (custom.totalBals.length < maxLen) {
     custom.totalBals.push(0)
     custom.totalInterests.push(custom.totalInterests[custom.totalInterests.length - 1] || 0)

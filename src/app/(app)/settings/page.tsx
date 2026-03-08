@@ -2,24 +2,23 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { LogOut, RotateCcw, Moon, Sun, Monitor, Plus, X, Link, Unlink, Loader2 } from "lucide-react"
+import { LogOut, RotateCcw, Moon, Sun, Monitor, Link, Unlink, Loader2, Plus, CreditCard, Wifi } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { useToast } from "@/components/toast"
-import { cn } from "@/lib/utils"
+import { cn, currencySymbol } from "@/lib/utils"
+import { CreditCard as CreditCardType } from "@/types/card"
 
 export default function SettingsPage() {
   const {
-    currency, theme, utilThreshold, addresses, userName, userEmail,
+    currency, theme, utilThreshold, userName, userEmail, cards,
     setCurrency, setTheme, setUtilThreshold, setUserName,
-    addAddress, removeAddress,
-    resetCards, logout, cards,
+    addCard, resetCards, logout,
   } = useStore()
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [confirmReset, setConfirmReset] = useState(false)
   const [confirmLogout, setConfirmLogout] = useState(false)
-  const [newAddress, setNewAddress] = useState("")
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState(userName)
 
@@ -27,10 +26,26 @@ export default function SettingsPage() {
   const [tlConnected, setTlConnected] = useState<boolean | null>(null)
   const [tlLoading, setTlLoading] = useState(false)
 
+  // Add card wizard state
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [wizardStep, setWizardStep] = useState<"type" | "tl-select" | "manual" | "configure">("type")
+  const [wizardType, setWizardType] = useState<"truelayer" | "manual">("manual")
+  const [tlDiscoveredCards, setTlDiscoveredCards] = useState<any[]>([])
+  const [selectedTlCard, setSelectedTlCard] = useState<any>(null)
+
+  // Manual card form
+  const [formIssuer, setFormIssuer] = useState("")
+  const [formLast4, setFormLast4] = useState("")
+  const [formLimit, setFormLimit] = useState("")
+  const [formBalance, setFormBalance] = useState("")
+  const [formAPR, setFormAPR] = useState("")
+  const [formPaymentDay, setFormPaymentDay] = useState("5")
+  const [formStatementDay, setFormStatementDay] = useState("1")
+  const [formDD, setFormDD] = useState<CreditCardType["dd"]>("none")
+  const [formDDAmount, setFormDDAmount] = useState("")
+
   useEffect(() => {
-    // Check TrueLayer connection status
     fetch("/api/truelayer/status").then(r => r.json()).then(d => setTlConnected(d.connected)).catch(() => setTlConnected(false))
-    // Handle callback params
     if (searchParams.get("tl_connected")) {
       setTlConnected(true)
       toast("Bank account connected successfully")
@@ -60,7 +75,78 @@ export default function SettingsPage() {
     if (!confirmReset) { setConfirmReset(true); return }
     resetCards()
     setConfirmReset(false)
-    toast("Cards reset to demo data")
+    toast("All cards removed")
+  }
+
+  const startWizard = (type: "truelayer" | "manual") => {
+    setWizardType(type)
+    if (type === "truelayer") {
+      fetch("/api/truelayer/balances")
+        .then(r => r.json())
+        .then(d => {
+          if (d.connected && d.cards) {
+            const existingLast4s = new Set(cards.filter(c => c.source === "truelayer").map(c => c.last4))
+            const available = d.cards.filter((tc: any) => !existingLast4s.has(tc.partialNumber?.slice(-4) || ""))
+            setTlDiscoveredCards(available)
+            setWizardStep("tl-select")
+          }
+        })
+        .catch(() => toast("Failed to fetch bank cards"))
+    } else {
+      setWizardStep("manual")
+    }
+  }
+
+  const selectTlCard = (tc: any) => {
+    setSelectedTlCard(tc)
+    setFormIssuer(tc.displayName || tc.cardNetwork || "")
+    setFormLast4(tc.partialNumber?.slice(-4) || "0000")
+    setFormLimit(tc.balance?.creditLimit?.toString() || "")
+    setFormBalance(tc.balance?.current?.toString() || "0")
+    setWizardStep("configure")
+  }
+
+  const handleSaveCard = () => {
+    const issuer = formIssuer.trim()
+    if (!issuer) { toast("Issuer name required"); return }
+
+    const newCard: CreditCardType = {
+      id: Date.now(),
+      issuer,
+      last4: formLast4 || "0000",
+      openingBalance: parseFloat(formBalance) || 0,
+      openingMonth: new Date().toISOString().substring(0, 7),
+      limit: parseFloat(formLimit) || 0,
+      aprRegular: parseFloat(formAPR) || 0,
+      aprPromo: null,
+      promoUntil: null,
+      dd: formDD,
+      ddAmount: parseFloat(formDDAmount) || 0,
+      paymentDay: parseInt(formPaymentDay) || 5,
+      statementDay: parseInt(formStatementDay) || 1,
+      source: wizardType,
+      tlAccountId: selectedTlCard?.accountId || null,
+      monthlyRecords: [],
+    }
+
+    addCard(newCard)
+    toast(`${issuer} added`)
+    resetWizard()
+  }
+
+  const resetWizard = () => {
+    setWizardOpen(false)
+    setWizardStep("type")
+    setSelectedTlCard(null)
+    setFormIssuer("")
+    setFormLast4("")
+    setFormLimit("")
+    setFormBalance("")
+    setFormAPR("")
+    setFormPaymentDay("5")
+    setFormStatementDay("1")
+    setFormDD("none")
+    setFormDDAmount("")
   }
 
   return (
@@ -108,6 +194,140 @@ export default function SettingsPage() {
           </div>
         </Section>
 
+        {/* Add Card Wizard */}
+        <Section title="Add Card">
+          {!wizardOpen ? (
+            <button
+              onClick={() => setWizardOpen(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium bg-foreground text-background rounded-md hover:opacity-90 transition-opacity"
+            >
+              <Plus className="w-4 h-4" />
+              Add a new card
+            </button>
+          ) : wizardStep === "type" ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground mb-3">How would you like to add this card?</p>
+              {tlConnected && (
+                <button
+                  onClick={() => startWizard("truelayer")}
+                  className="w-full flex items-center gap-3 py-3 px-3 text-sm font-medium bg-success/10 border border-success/20 rounded-md hover:bg-success/15 transition-colors"
+                >
+                  <Wifi className="w-4 h-4 text-success" />
+                  <div className="text-left">
+                    <div>Import from bank</div>
+                    <div className="text-[0.6875rem] text-muted-foreground font-normal">Auto-fills from your connected account</div>
+                  </div>
+                </button>
+              )}
+              <button
+                onClick={() => startWizard("manual")}
+                className="w-full flex items-center gap-3 py-3 px-3 text-sm font-medium bg-secondary border border-border rounded-md hover:bg-accent transition-colors"
+              >
+                <CreditCard className="w-4 h-4" />
+                <div className="text-left">
+                  <div>Enter manually</div>
+                  <div className="text-[0.6875rem] text-muted-foreground font-normal">For cards not in your connected bank</div>
+                </div>
+              </button>
+              <button onClick={resetWizard} className="w-full text-xs text-muted-foreground mt-1 underline">Cancel</button>
+            </div>
+          ) : wizardStep === "tl-select" ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground mb-2">Select a card from your bank:</p>
+              {tlDiscoveredCards.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No new cards found. All bank cards are already added.</p>
+              ) : (
+                tlDiscoveredCards.map((tc: any, i: number) => (
+                  <button
+                    key={i}
+                    onClick={() => selectTlCard(tc)}
+                    className="w-full flex items-center justify-between py-2.5 px-3 text-sm bg-secondary border border-border rounded-md hover:bg-accent transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Wifi className="w-3 h-3 text-success" />
+                      <span className="font-medium">{tc.displayName || tc.cardNetwork}</span>
+                      <span className="text-xs text-muted-foreground font-mono">••{tc.partialNumber?.slice(-4)}</span>
+                    </div>
+                  </button>
+                ))
+              )}
+              <button onClick={() => setWizardStep("type")} className="w-full text-xs text-muted-foreground mt-1 underline">Back</button>
+            </div>
+          ) : (wizardStep === "manual" || wizardStep === "configure") ? (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground mb-1">
+                {wizardStep === "configure" ? "Fill in the remaining details:" : "Enter card details:"}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="col-span-2">
+                  <FieldLabel>Card Issuer / Name</FieldLabel>
+                  <input type="text" value={formIssuer} onChange={e => setFormIssuer(e.target.value)} placeholder="e.g. Barclaycard"
+                    className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
+                </div>
+                <div>
+                  <FieldLabel>Last 4 Digits</FieldLabel>
+                  <input type="text" value={formLast4} onChange={e => setFormLast4(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1234" maxLength={4}
+                    className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring font-mono" />
+                </div>
+                <div>
+                  <FieldLabel>Credit Limit</FieldLabel>
+                  <input type="number" value={formLimit} onChange={e => setFormLimit(e.target.value)} placeholder="0"
+                    className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
+                </div>
+                {wizardStep === "manual" && (
+                  <div>
+                    <FieldLabel>Current Balance</FieldLabel>
+                    <input type="number" value={formBalance} onChange={e => setFormBalance(e.target.value)} placeholder="0"
+                      className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
+                  </div>
+                )}
+                <div>
+                  <FieldLabel>APR (%)</FieldLabel>
+                  <input type="number" step="0.1" value={formAPR} onChange={e => setFormAPR(e.target.value)} placeholder="0"
+                    className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
+                </div>
+                <div>
+                  <FieldLabel>Payment Day (1-28)</FieldLabel>
+                  <input type="number" min="1" max="28" value={formPaymentDay} onChange={e => setFormPaymentDay(e.target.value)}
+                    className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
+                </div>
+                <div>
+                  <FieldLabel>Statement Day (1-28)</FieldLabel>
+                  <input type="number" min="1" max="28" value={formStatementDay} onChange={e => setFormStatementDay(e.target.value)}
+                    className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
+                </div>
+              </div>
+              <div>
+                <FieldLabel>Direct Debit</FieldLabel>
+                <div className="flex gap-1.5 flex-wrap mt-1">
+                  {(["none", "minimum", "custom", "full"] as const).map(opt => (
+                    <button key={opt} onClick={() => setFormDD(opt)}
+                      className={cn("px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors",
+                        formDD === opt ? "bg-foreground text-background" : "bg-secondary text-muted-foreground hover:text-foreground"
+                      )}>
+                      {opt === "none" ? "None" : opt === "minimum" ? "Minimum" : opt === "custom" ? "Custom" : "Full"}
+                    </button>
+                  ))}
+                </div>
+                {formDD === "custom" && (
+                  <input type="number" value={formDDAmount} onChange={e => setFormDDAmount(e.target.value)} placeholder={`${currencySymbol(currency)}0`}
+                    className="w-24 h-7 px-2 text-sm bg-background border border-border rounded-md outline-none focus:border-ring mt-2" />
+                )}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={handleSaveCard}
+                  className="flex-1 h-9 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity">
+                  Save Card
+                </button>
+                <button onClick={resetWizard}
+                  className="h-9 px-4 text-sm text-muted-foreground border border-border rounded-md hover:bg-accent transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </Section>
+
         {/* Connected Accounts */}
         <Section title="Connected Accounts">
           {tlConnected === null ? (
@@ -121,7 +341,7 @@ export default function SettingsPage() {
                 <span className="font-medium">Bank connected via TrueLayer</span>
               </div>
               <p className="text-[0.6875rem] text-muted-foreground">
-                Live balances are fetched from your bank. You can view them on each card.
+                Live balances are fetched from your bank. Connected cards update automatically.
               </p>
               <button
                 onClick={handleTlDisconnect}
@@ -135,7 +355,7 @@ export default function SettingsPage() {
           ) : (
             <div className="space-y-2">
               <p className="text-[0.6875rem] text-muted-foreground">
-                Connect your bank to see live credit card balances directly in CardPulse.
+                Connect your bank to see live credit card balances and auto-import cards.
               </p>
               <a
                 href="/api/truelayer/connect"
@@ -212,61 +432,6 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        {/* Notifications */}
-        <Section title="Notifications">
-          <div className="space-y-2">
-            <ToggleRow label="Payment reminders" defaultOn />
-            <ToggleRow label="Utilization alerts" defaultOn />
-            <ToggleRow label="Weekly summary email" defaultOn={false} />
-          </div>
-          <div className="text-[0.6875rem] text-muted-foreground/80 italic mt-2">
-            Demo mode — notifications are simulated
-          </div>
-        </Section>
-
-        {/* Saved Addresses */}
-        <Section title="Saved Addresses">
-          <div className="space-y-1.5">
-            {addresses.map(a => (
-              <div key={a} className="flex items-center gap-2 group">
-                <span className="text-sm flex-1 min-w-0 truncate">{a}</span>
-                <button
-                  onClick={() => { removeAddress(a); toast("Address removed") }}
-                  className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-destructive rounded-md opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-          <form
-            className="flex gap-2 mt-3"
-            onSubmit={e => {
-              e.preventDefault()
-              const trimmed = newAddress.trim()
-              if (trimmed) {
-                addAddress(trimmed)
-                setNewAddress("")
-                toast("Address added")
-              }
-            }}
-          >
-            <input
-              type="text"
-              value={newAddress}
-              onChange={e => setNewAddress(e.target.value)}
-              placeholder="Add new address..."
-              className="flex-1 h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring"
-            />
-            <button
-              type="submit"
-              className="h-8 w-8 flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground rounded-md transition-colors shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </form>
-        </Section>
-
         {/* Data */}
         <Section title="Data">
           <button
@@ -279,7 +444,7 @@ export default function SettingsPage() {
             )}
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            {confirmReset ? "Tap again to confirm reset" : "Reset to demo data"}
+            {confirmReset ? "Tap again to confirm reset" : "Remove all cards"}
           </button>
           {confirmReset && (
             <button onClick={() => setConfirmReset(false)} className="w-full text-xs text-muted-foreground mt-1 underline">
@@ -309,7 +474,7 @@ export default function SettingsPage() {
 
         {/* Version */}
         <div className="text-center text-[0.625rem] text-muted-foreground/60 pt-2 pb-20">
-          CardPulse v0.1.0 — Demo Build
+          CardPulse v2.0.0
         </div>
       </div>
     </>
@@ -327,22 +492,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function ToggleRow({ label, defaultOn }: { label: string; defaultOn: boolean }) {
-  const [on, setOn] = useState(defaultOn)
-  return (
-    <div className="flex items-center justify-between cursor-pointer" onClick={() => setOn(!on)}>
-      <span className="text-sm">{label}</span>
-      <div
-        className={cn(
-          "w-9 h-5 rounded-full relative transition-colors",
-          on ? "bg-foreground" : "bg-border"
-        )}
-      >
-        <span className={cn(
-          "absolute top-0.5 w-4 h-4 rounded-full bg-background transition-transform",
-          on ? "left-[18px]" : "left-0.5"
-        )} />
-      </div>
-    </div>
-  )
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <div className="text-[0.625rem] uppercase tracking-wider text-muted-foreground font-medium mb-1">{children}</div>
 }

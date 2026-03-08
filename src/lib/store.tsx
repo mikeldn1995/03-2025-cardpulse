@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from "react"
-import { CreditCard, StatementEntry, AppState } from "@/types/card"
+import { CreditCard, MonthlyRecord, AppState } from "@/types/card"
 
 const DEFAULT_STATE: AppState = {
   loggedIn: false,
@@ -13,13 +13,15 @@ const DEFAULT_STATE: AppState = {
   theme: "system",
   cards: [],
   forecastMonthly: 200,
-  addresses: [],
+  onboarded: false,
 }
 
 interface StoreContextType extends AppState {
   loginWithSession: (user: { id: number; email: string; name: string }) => Promise<void>
   logout: () => void
   setUserName: (name: string) => void
+  setOnboarded: (v: boolean) => void
+  addCard: (card: CreditCard) => void
   updateCard: (id: number, updates: Partial<CreditCard>) => void
   deleteCard: (id: number) => void
   setCurrency: (c: AppState["currency"]) => void
@@ -27,10 +29,8 @@ interface StoreContextType extends AppState {
   setUtilThreshold: (n: number) => void
   setForecastMonthly: (n: number) => void
   resetCards: () => void
-  addAddress: (a: string) => void
-  removeAddress: (a: string) => void
-  upsertStatement: (cardId: number, statement: StatementEntry) => void
-  deleteStatement: (cardId: number, month: string) => void
+  upsertRecord: (cardId: number, record: MonthlyRecord) => void
+  deleteRecord: (cardId: number, month: string) => void
 }
 
 const StoreContext = createContext<StoreContextType | null>(null)
@@ -49,7 +49,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const res = await fetch("/api/auth/session")
         const data = await res.json()
         if (data.user) {
-          // Load full state from API
           const stateRes = await fetch("/api/state")
           if (stateRes.ok) {
             const dbState = await stateRes.json()
@@ -63,7 +62,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               theme: (dbState.theme ?? "system") as AppState["theme"],
               cards: dbState.cards || [],
               forecastMonthly: dbState.forecastMonthly ?? 200,
-              addresses: dbState.addresses || [],
+              onboarded: dbState.onboarded ?? false,
             })
           }
         }
@@ -89,8 +88,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             theme: s.theme,
             utilThreshold: s.utilThreshold,
             forecastMonthly: s.forecastMonthly,
+            onboarded: s.onboarded,
             cards: s.cards,
-            addresses: s.addresses,
           }),
         })
       } catch (e) {
@@ -117,7 +116,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [state.theme, hydrated])
 
   const loginWithSession = useCallback(async (user: { id: number; email: string; name: string }) => {
-    // Session cookie already set by verify-otp, load state from API
     try {
       const stateRes = await fetch("/api/state")
       if (stateRes.ok) {
@@ -132,12 +130,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           theme: (dbState.theme ?? "system") as AppState["theme"],
           cards: dbState.cards || [],
           forecastMonthly: dbState.forecastMonthly ?? 200,
-          addresses: dbState.addresses || [],
+          onboarded: dbState.onboarded ?? false,
         })
         return
       }
     } catch {}
-    // Fallback: minimal state
     setState(prev => ({
       ...prev,
       loggedIn: true,
@@ -151,9 +148,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, userName }))
   }, [])
 
+  const setOnboarded = useCallback((onboarded: boolean) => {
+    setState(prev => ({ ...prev, onboarded }))
+  }, [])
+
   const logout = useCallback(async () => {
     try { await fetch("/api/auth/logout", { method: "POST" }) } catch {}
     setState(DEFAULT_STATE)
+  }, [])
+
+  const addCard = useCallback((card: CreditCard) => {
+    setState(prev => ({ ...prev, cards: [...prev.cards, card] }))
   }, [])
 
   const updateCard = useCallback((id: number, updates: Partial<CreditCard>) => {
@@ -187,35 +192,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, cards: [] }))
   }, [])
 
-  const addAddress = useCallback((a: string) => {
-    setState(prev => prev.addresses.includes(a) ? prev : { ...prev, addresses: [...prev.addresses, a] })
-  }, [])
-
-  const removeAddress = useCallback((a: string) => {
-    setState(prev => ({ ...prev, addresses: prev.addresses.filter(x => x !== a) }))
-  }, [])
-
-  const upsertStatement = useCallback((cardId: number, statement: StatementEntry) => {
+  const upsertRecord = useCallback((cardId: number, record: MonthlyRecord) => {
     setState(prev => ({
       ...prev,
       cards: prev.cards.map(c => {
         if (c.id !== cardId) return c
-        const existing = c.statements.findIndex(s => s.month === statement.month)
-        const statements = [...c.statements]
-        if (existing >= 0) statements[existing] = statement
-        else statements.push(statement)
-        statements.sort((a, b) => a.month.localeCompare(b.month))
-        return { ...c, statements }
+        const existing = c.monthlyRecords.findIndex(r => r.month === record.month)
+        const records = [...c.monthlyRecords]
+        if (existing >= 0) records[existing] = record
+        else records.push(record)
+        records.sort((a, b) => a.month.localeCompare(b.month))
+        return { ...c, monthlyRecords: records }
       }),
     }))
   }, [])
 
-  const deleteStatement = useCallback((cardId: number, month: string) => {
+  const deleteRecord = useCallback((cardId: number, month: string) => {
     setState(prev => ({
       ...prev,
       cards: prev.cards.map(c => {
         if (c.id !== cardId) return c
-        return { ...c, statements: c.statements.filter(s => s.month !== month) }
+        return { ...c, monthlyRecords: c.monthlyRecords.filter(r => r.month !== month) }
       }),
     }))
   }, [])
@@ -224,9 +221,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   return (
     <StoreContext.Provider value={{
-      ...state, loginWithSession, logout, setUserName, updateCard, deleteCard,
+      ...state, loginWithSession, logout, setUserName, setOnboarded,
+      addCard, updateCard, deleteCard,
       setCurrency, setTheme, setUtilThreshold, setForecastMonthly, resetCards,
-      addAddress, removeAddress, upsertStatement, deleteStatement,
+      upsertRecord, deleteRecord,
     }}>
       {children}
     </StoreContext.Provider>

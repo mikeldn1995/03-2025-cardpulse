@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server"
 import { db } from "@/db"
-import { users, cards, addresses } from "@/db/schema"
+import { users, cards } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import cardsDb from "@/data/cards.json"
 
 export async function POST() {
   const email = "michael.gb@icloud.com"
 
-  // Check if user already exists
   const existing = await db.select().from(users).where(eq(users.email, email)).limit(1)
   let userId: number
 
@@ -21,14 +20,9 @@ export async function POST() {
       theme: "system",
       utilThreshold: 75,
       forecastMonthly: 200,
+      onboarded: true,
     }).returning()
     userId = user.id
-  }
-
-  // Seed address
-  const existingAddrs = await db.select().from(addresses).where(eq(addresses.userId, userId))
-  if (existingAddrs.length === 0) {
-    await db.insert(addresses).values({ userId, address: cardsDb.defaultAddress })
   }
 
   // Seed cards (skip if already seeded)
@@ -39,7 +33,6 @@ export async function POST() {
         userId,
         issuer: c.issuer,
         last4: c.last4,
-        fullNumber: c.fullNumber,
         openingBalance: c.openingBalance,
         openingMonth: c.openingMonth,
         creditLimit: c.limit,
@@ -48,8 +41,8 @@ export async function POST() {
         promoUntil: c.promoUntil,
         dd: c.dd,
         ddAmount: c.ddAmount,
-        address: cardsDb.defaultAddress,
         paymentDay: c.paymentDay,
+        source: "manual",
       })
     }
   }

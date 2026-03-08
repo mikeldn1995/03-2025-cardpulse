@@ -6,7 +6,6 @@ const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/cards": "My Cards",
   "/forecast": "Forecast",
-  "/upload": "Upload",
   "/settings": "Settings",
 }
 

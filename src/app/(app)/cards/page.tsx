@@ -2,12 +2,17 @@
 
 import { useState, useEffect, useRef, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
-import { ChevronDown, Eye, Trash2, AlertTriangle, X, RefreshCw, ArrowUpDown, Wifi } from "lucide-react"
+import { ChevronDown, Trash2, AlertTriangle, X, RefreshCw, ArrowUpDown, Wifi, Minus, Plus } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { useToast } from "@/components/toast"
 import { InlineEdit } from "@/components/ui/inline-edit"
-import { fmt, utilPercent, utilColor, utilBarColor, getEffectiveAPR, getBalance, ordinal, maskNumber, formatDate, cn, currencySymbol, getMissingMonths, currentMonth } from "@/lib/utils"
-import { CreditCard, StatementEntry } from "@/types/card"
+import {
+  fmt, utilPercent, utilColor, utilBarColor, getEffectiveAPR, getBalance,
+  ordinal, formatDate, cn, currencySymbol, getMissingMonths, currentMonth,
+  getIssuerColor, getOpeningBalanceForMonth, estimateInterest, computeClosingBalance,
+  deriveInterest,
+} from "@/lib/utils"
+import { CreditCard, MonthlyRecord } from "@/types/card"
 
 function formatMonthLabel(m: string): string {
   const [y, mo] = m.split("-")
@@ -15,85 +20,81 @@ function formatMonthLabel(m: string): string {
   return d.toLocaleDateString("en-GB", { month: "short", year: "numeric" })
 }
 
-function StatementRow({ entry, card, currency, isCurrentMonth, onUpdate, onDelete, onRecalc }: {
-  entry: StatementEntry
+function RecordRow({ record, card, currency, isCurrentMonth, onUpdate, onDelete }: {
+  record: MonthlyRecord
   card: CreditCard
   currency: string
   isCurrentMonth?: boolean
-  onUpdate: (updates: Partial<StatementEntry>) => void
+  onUpdate: (updates: Partial<MonthlyRecord>) => void
   onDelete: () => void
-  onRecalc: () => void
 }) {
   const [confirmDel, setConfirmDel] = useState(false)
+  const opening = getOpeningBalanceForMonth(card, record.month)
+  const derivedInterest = deriveInterest(card, record)
 
   return (
     <div className={cn("rounded-md px-3 py-2", isCurrentMonth ? "bg-primary/5 border border-primary/20" : "bg-secondary/50")}>
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs font-semibold flex items-center gap-1.5">
-          {formatMonthLabel(entry.month)}
-          {isCurrentMonth && <span className="text-[0.625rem] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">Live</span>}
+          {formatMonthLabel(record.month)}
+          {isCurrentMonth && <span className="text-[0.625rem] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">Current</span>}
+          <span className={cn(
+            "text-[0.625rem] uppercase tracking-wider font-medium px-1.5 py-0.5 rounded",
+            record.source === "truelayer" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
+          )}>
+            {record.source === "truelayer" ? "Live" : "Manual"}
+          </span>
         </span>
         <div className="flex items-center gap-1">
-          <button
-            onClick={onRecalc}
-            title="Recalculate interest"
-            className="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground rounded transition-colors"
-          >
-            <RefreshCw className="w-3 h-3" />
-          </button>
           {confirmDel ? (
             <div className="flex items-center gap-1">
               <button onClick={onDelete} className="text-[0.625rem] text-destructive font-medium underline">Delete</button>
               <button onClick={() => setConfirmDel(false)} className="text-[0.625rem] text-muted-foreground underline">Cancel</button>
             </div>
           ) : (
-            <button
-              onClick={() => setConfirmDel(true)}
-              className="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-destructive rounded transition-colors"
-            >
+            <button onClick={() => setConfirmDel(true)}
+              className="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-destructive rounded transition-colors">
               <X className="w-3 h-3" />
             </button>
           )}
-          <span className={cn(
-            "text-[0.625rem] uppercase tracking-wider font-medium px-1.5 py-0.5 rounded ml-0.5",
-            entry.source === "upload" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-          )}>
-            {entry.source}
-          </span>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
         <div>
-          <div className="text-muted-foreground mb-0.5">Spent</div>
+          <div className="text-muted-foreground mb-0.5">Debits (spending)</div>
           <InlineEdit
-            value={entry.spent}
-            displayValue={fmt(entry.spent, currency)}
+            value={record.debits}
+            displayValue={fmt(record.debits, currency)}
             type="number"
             step="0.01"
-            onSave={v => { const n = parseFloat(v); if (!isNaN(n)) onUpdate({ spent: n }) }}
+            onSave={v => { const n = parseFloat(v); if (!isNaN(n)) onUpdate({ debits: n }) }}
             inputClassName="w-20"
           />
         </div>
         <div>
-          <div className="text-muted-foreground mb-0.5">Paid</div>
+          <div className="text-muted-foreground mb-0.5">Credits (payments)</div>
           <InlineEdit
-            value={entry.paid}
-            displayValue={fmt(entry.paid, currency)}
+            value={record.credits}
+            displayValue={fmt(record.credits, currency)}
             type="number"
             step="0.01"
-            onSave={v => { const n = parseFloat(v); if (!isNaN(n)) onUpdate({ paid: n }) }}
+            onSave={v => { const n = parseFloat(v); if (!isNaN(n)) onUpdate({ credits: n }) }}
             inputClassName="w-20"
           />
         </div>
         <div>
-          <div className="text-muted-foreground mb-0.5">Interest</div>
+          <div className="text-muted-foreground mb-0.5">Interest <span className="italic opacity-60">(derived)</span></div>
+          <span className="text-sm font-medium">{fmt(derivedInterest, currency)}</span>
+        </div>
+        <div>
+          <div className="text-muted-foreground mb-0.5">Closing Balance</div>
           <InlineEdit
-            value={entry.interest}
-            displayValue={fmt(entry.interest, currency)}
+            value={record.closingBalance}
+            displayValue={fmt(record.closingBalance, currency)}
             type="number"
             step="0.01"
-            onSave={v => { const n = parseFloat(v); if (!isNaN(n)) onUpdate({ interest: n }) }}
-            inputClassName="w-20"
+            onSave={v => { const n = parseFloat(v); if (!isNaN(n)) onUpdate({ closingBalance: n }) }}
+            inputClassName="w-24"
           />
         </div>
       </div>
@@ -106,26 +107,27 @@ type SortKey = "default" | "due" | "balance" | "utilization" | "apr"
 interface LiveBal { current: number; available: number; creditLimit: number }
 
 function CardItem({ card, autoExpand, liveBal }: { card: CreditCard; autoExpand?: boolean; liveBal?: LiveBal | null }) {
-  const { updateCard, deleteCard, upsertStatement, deleteStatement, currency, addresses } = useStore()
+  const { updateCard, deleteCard, upsertRecord, deleteRecord, currency } = useStore()
   const { toast } = useToast()
   const [expanded, setExpanded] = useState(autoExpand || false)
-  const [revealed, setRevealed] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<0 | 1 | 2>(0)
   const [showHistory, setShowHistory] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
-  const balance = getBalance(card)
-  const util = utilPercent(card)
-  const avail = card.limit - balance
-  const lastStatement = card.statements.length > 0 ? card.statements[card.statements.length - 1] : null
-  const interest = lastStatement ? lastStatement.interest : 0
+  const balance = liveBal ? liveBal.current : getBalance(card)
+  const limit = liveBal ? liveBal.creditLimit : card.limit
+  const util = limit > 0 ? (balance / limit) * 100 : 0
+  const avail = limit - balance
   const cm = currentMonth()
   const allMissing = getMissingMonths(card)
   const pastMissing = allMissing.filter(m => m !== cm)
-  const currentMonthMissing = allMissing.includes(cm)
-  const missingMonths = pastMissing
-  const missing = pastMissing.length > 0
   const effectiveAPR = getEffectiveAPR(card)
+  const issuerColor = getIssuerColor(card.issuer)
+  const isConnected = card.source === "truelayer" || !!liveBal
+
+  // Manual debit/credit entry state
+  const [entryAmount, setEntryAmount] = useState("")
+  const [entryType, setEntryType] = useState<"debit" | "credit">("debit")
 
   useEffect(() => {
     if (autoExpand && cardRef.current) {
@@ -147,77 +149,83 @@ function CardItem({ card, autoExpand, liveBal }: { card: CreditCard; autoExpand?
   const handleDelete = () => {
     if (confirmDelete === 0) setConfirmDelete(1)
     else if (confirmDelete === 1) setConfirmDelete(2)
-    else {
-      deleteCard(card.id)
-      toast(`${card.issuer} deleted`)
-    }
+    else { deleteCard(card.id); toast(`${card.issuer} deleted`) }
   }
 
   const addMissingMonth = (month: string) => {
-    // Calculate balance at that point to estimate interest
-    const sorted = [...card.statements].sort((a, b) => a.month.localeCompare(b.month))
-    let balAtMonth = card.openingBalance
-    for (const s of sorted) {
-      if (s.month >= month) break
-      balAtMonth += s.spent - s.paid + s.interest
-    }
-    const isPromo = card.aprPromo !== null && card.promoUntil && new Date(card.promoUntil) > new Date(month + "-28")
-    const apr = isPromo ? card.aprPromo! : card.aprRegular
-    const monthlyInterest = Math.round(balAtMonth * (apr / 100 / 12) * 100) / 100
-    upsertStatement(card.id, { month, spent: 0, paid: 0, interest: monthlyInterest, source: "manual" })
-    toast(`Statement added for ${formatMonthLabel(month)}`)
+    const opening = getOpeningBalanceForMonth(card, month)
+    const interest = estimateInterest(opening, card)
+    const closingBalance = computeClosingBalance(opening, 0, 0, interest)
+    upsertRecord(card.id, { month, debits: 0, credits: 0, interest, closingBalance, source: "manual" })
+    toast(`Record added for ${formatMonthLabel(month)}`)
   }
 
-  const handleStatementUpdate = (month: string, updates: Partial<StatementEntry>) => {
-    const existing = card.statements.find(s => s.month === month)
+  const handleRecordUpdate = (month: string, updates: Partial<MonthlyRecord>) => {
+    const existing = card.monthlyRecords.find(r => r.month === month)
     if (!existing) return
-    upsertStatement(card.id, { ...existing, ...updates })
+    const updated = { ...existing, ...updates }
+    // Recompute interest and closing balance if debits/credits changed
+    if (updates.debits !== undefined || updates.credits !== undefined) {
+      const opening = getOpeningBalanceForMonth(card, month)
+      const interest = estimateInterest(opening, card)
+      updated.interest = interest
+      updated.closingBalance = computeClosingBalance(opening, updated.debits, updated.credits, interest)
+    }
+    upsertRecord(card.id, updated)
     toast("Saved")
   }
 
-  const recalcInterest = (month: string) => {
-    // Find the balance just before this statement month
-    const sorted = [...card.statements].sort((a, b) => a.month.localeCompare(b.month))
-    const idx = sorted.findIndex(s => s.month === month)
-    let balBefore = card.openingBalance
-    for (let i = 0; i < idx; i++) {
-      balBefore += sorted[i].spent - sorted[i].paid + sorted[i].interest
+  const handleDeleteRecord = (month: string) => {
+    deleteRecord(card.id, month)
+    toast("Record deleted")
+  }
+
+  const handleAddEntry = () => {
+    const amount = parseFloat(entryAmount)
+    if (isNaN(amount) || amount <= 0) return
+
+    const existing = card.monthlyRecords.find(r => r.month === cm)
+    const opening = getOpeningBalanceForMonth(card, cm)
+
+    if (existing) {
+      const newDebits = entryType === "debit" ? existing.debits + amount : existing.debits
+      const newCredits = entryType === "credit" ? existing.credits + amount : existing.credits
+      const interest = estimateInterest(opening, card)
+      const closingBalance = computeClosingBalance(opening, newDebits, newCredits, interest)
+      upsertRecord(card.id, { ...existing, debits: newDebits, credits: newCredits, interest, closingBalance })
+    } else {
+      const debits = entryType === "debit" ? amount : 0
+      const credits = entryType === "credit" ? amount : 0
+      const interest = estimateInterest(opening, card)
+      const closingBalance = computeClosingBalance(opening, debits, credits, interest)
+      upsertRecord(card.id, { month: cm, debits, credits, interest, closingBalance, source: "manual" })
     }
-    // Check if promo was active during this month
-    const isPromo = card.aprPromo !== null && card.promoUntil && new Date(card.promoUntil) > new Date(month + "-28")
-    const apr = isPromo ? card.aprPromo! : card.aprRegular
-    const newInterest = Math.round(balBefore * (apr / 100 / 12) * 100) / 100
-    const existing = sorted[idx]
-    upsertStatement(card.id, { ...existing, interest: newInterest })
-    toast(`Interest recalculated: ${fmt(newInterest, currency)}`)
+
+    toast(`${entryType === "debit" ? "Debit" : "Credit"} of ${fmt(amount, currency)} added`)
+    setEntryAmount("")
   }
 
-  const handleDeleteStatement = (month: string) => {
-    deleteStatement(card.id, month)
-    toast("Statement deleted")
-  }
-
-  const [editingNumber, setEditingNumber] = useState(false)
-  const [numberInput, setNumberInput] = useState(card.fullNumber)
   const [editingOpeningMonth, setEditingOpeningMonth] = useState(false)
   const [openingMonthInput, setOpeningMonthInput] = useState(card.openingMonth)
   const [promoEditing, setPromoEditing] = useState(false)
   const [promoRate, setPromoRate] = useState(card.aprPromo ?? 0)
   const [promoDate, setPromoDate] = useState(card.promoUntil?.substring(0, 7) || new Date().toISOString().substring(0, 7))
 
-  const sortedStatements = [...card.statements].sort((a, b) => b.month.localeCompare(a.month))
+  const sortedRecords = [...card.monthlyRecords].sort((a, b) => b.month.localeCompare(a.month))
 
   return (
     <div ref={cardRef} className={cn(
       "bg-card border rounded-lg overflow-hidden transition-colors",
-      autoExpand ? "border-ring ring-2 ring-ring/20" : missing ? "border-warning/50" : "border-border hover:border-ring/40"
+      autoExpand ? "border-ring ring-2 ring-ring/20" : issuerColor.border
     )}>
       {/* Summary row */}
-      <div className="flex items-center px-4 py-3.5 gap-3">
-        <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+      <div className="flex items-center px-4 py-3.5 gap-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", utilBarColor(util))} />
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-semibold truncate">{card.issuer}</span>
-            {missing && <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />}
+            {isConnected && <Wifi className="w-2.5 h-2.5 text-success shrink-0" />}
+            {pastMissing.length > 0 && <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />}
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground font-mono">•••• {card.last4}</span>
@@ -232,41 +240,11 @@ function CardItem({ card, autoExpand, liveBal }: { card: CreditCard; autoExpand?
           </div>
         </div>
         <div className="text-right shrink-0">
-          {liveBal ? (
-            <>
-              <div className="text-sm font-semibold tabular-nums flex items-center justify-end gap-1">
-                {fmt(liveBal.current, currency)}
-                <Wifi className="w-2.5 h-2.5 text-success" />
-              </div>
-              <div className="text-[0.6875rem] text-muted-foreground">{fmt(liveBal.available, currency)} avail</div>
-            </>
-          ) : (
-            <>
-              <div className="text-sm font-semibold tabular-nums">{fmt(balance, currency)}</div>
-              <div className="text-[0.6875rem] text-muted-foreground">{fmt(avail, currency)} avail</div>
-            </>
-          )}
+          <div className="text-sm font-semibold tabular-nums">{fmt(balance, currency)}</div>
+          <div className="text-[0.6875rem] text-muted-foreground">{fmt(avail, currency)} avail</div>
         </div>
-        <div className="flex gap-1 shrink-0">
-          <button onClick={e => { e.stopPropagation(); handleDelete() }}
-            className={cn("w-8 h-8 flex items-center justify-center rounded-md transition-colors",
-              confirmDelete > 0 ? "text-destructive bg-destructive/10" : "text-muted-foreground hover:bg-accent hover:text-destructive")}>
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-        <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform cursor-pointer shrink-0", expanded && "rotate-180")}
-          onClick={() => setExpanded(!expanded)} />
+        <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform shrink-0", expanded && "rotate-180")} />
       </div>
-
-      {/* Missing statement banner */}
-      {missing && !expanded && (
-        <div className="px-4 pb-2">
-          <div className="text-[0.6875rem] text-warning flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3" />
-            {missingMonths.length} missing statement{missingMonths.length !== 1 ? "s" : ""} since {formatMonthLabel(card.openingMonth)}
-          </div>
-        </div>
-      )}
 
       {/* Delete confirmation */}
       {confirmDelete > 0 && (
@@ -284,54 +262,8 @@ function CardItem({ card, autoExpand, liveBal }: { card: CreditCard; autoExpand?
       {/* Expanded detail */}
       {expanded && (
         <div className="border-t border-border px-4 pb-4">
+          {/* Card Settings */}
           <div className="grid grid-cols-2 gap-3 pt-3.5">
-            {/* Card number */}
-            <div className="col-span-2">
-              <Label>Card Number</Label>
-              {editingNumber ? (
-                <form className="flex items-center gap-1.5 mt-0.5" onSubmit={e => {
-                  e.preventDefault()
-                  updateCard(card.id, { fullNumber: numberInput.trim() })
-                  setEditingNumber(false)
-                  toast("Card number updated")
-                }}>
-                  <input
-                    type="text"
-                    value={numberInput}
-                    onChange={e => setNumberInput(e.target.value)}
-                    placeholder="1234 5678 9012 3456"
-                    autoFocus
-                    className="h-8 flex-1 px-2 text-sm font-mono bg-background border border-ring rounded-md outline-none"
-                  />
-                  <button type="submit" className="text-xs font-medium text-foreground underline shrink-0">Save</button>
-                  <button type="button" onClick={() => { setEditingNumber(false); setNumberInput(card.fullNumber) }} className="text-xs text-muted-foreground underline shrink-0">Cancel</button>
-                </form>
-              ) : (
-                <div className="flex items-center gap-2">
-                  {card.fullNumber ? (
-                    <>
-                      <span
-                        className="text-sm font-medium font-mono tracking-wider cursor-pointer border-b border-dashed border-transparent hover:border-border pb-px"
-                        onClick={() => { setNumberInput(card.fullNumber); setEditingNumber(true) }}
-                      >
-                        {revealed ? card.fullNumber : maskNumber(card.fullNumber)}
-                      </span>
-                      <button onClick={() => setRevealed(!revealed)} className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:bg-accent rounded-md">
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => { setNumberInput(""); setEditingNumber(true) }}
-                      className="text-sm text-muted-foreground cursor-pointer border-b border-dashed border-border hover:border-ring pb-px"
-                    >
-                      Click to add card number
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
             <div><Label>Balance <span className="italic opacity-60">(auto)</span></Label><div className="text-sm font-medium">{fmt(balance, currency)}</div></div>
             <div><Label>Available <span className="italic opacity-60">(auto)</span></Label><div className="text-sm font-medium opacity-65 italic">{fmt(avail, currency)}</div></div>
             <div><Label>Credit Limit</Label><div className="text-sm font-medium"><InlineEdit value={card.limit} displayValue={fmt(card.limit, currency)} type="number" step="0.01" onSave={v => save("limit", v)} inputClassName="w-24" /></div></div>
@@ -372,20 +304,8 @@ function CardItem({ card, autoExpand, liveBal }: { card: CreditCard; autoExpand?
                 <div className={cn("text-xs font-semibold mt-1", utilColor(util))}>{util.toFixed(1)}%</div>
               </div>
             </div>
-            <div><Label>Last Month Interest <span className="italic opacity-60">(auto)</span></Label><div className="text-sm font-medium opacity-65 italic">{fmt(interest, currency)}</div></div>
+            <div><Label>Effective APR</Label><div className="text-sm font-medium">{effectiveAPR}%</div></div>
 
-            {/* Address dropdown */}
-            <div className="col-span-2">
-              <Label>Address on File</Label>
-              <select
-                value={card.address}
-                onChange={e => { updateCard(card.id, { address: e.target.value }); toast("Address updated") }}
-                className="w-full h-8 px-2 text-sm bg-background border border-border rounded-md outline-none focus:border-ring mt-0.5"
-              >
-                {addresses.map(a => <option key={a} value={a}>{a}</option>)}
-                {!addresses.includes(card.address) && <option value={card.address}>{card.address}</option>}
-              </select>
-            </div>
             <div>
               <Label>Payment Date</Label>
               <div className="text-sm font-medium"><InlineEdit value={card.paymentDay} displayValue={`${ordinal(card.paymentDay)} of each month`} type="number" min="1" max="28" step="1" onSave={v => save("paymentDay", v)} inputClassName="w-12 text-center" /></div>
@@ -399,15 +319,15 @@ function CardItem({ card, autoExpand, liveBal }: { card: CreditCard; autoExpand?
             <div className="col-span-2 border-t border-border pt-3 mt-1">
               <Label className="mb-2">Direct Debit Setup</Label>
               <div className="space-y-2">
-                {(["minimum", "custom", "none"] as const).map(opt => (
+                {(["minimum", "custom", "full", "none"] as const).map(opt => (
                   <label key={opt} className="flex items-center gap-2 text-[0.8125rem] cursor-pointer">
                     <input type="radio" name={`dd-${card.id}`} checked={card.dd === opt}
                       onChange={() => { updateCard(card.id, { dd: opt }); toast("Direct debit updated") }}
                       className="w-3.5 h-3.5 accent-foreground" />
-                    {opt === "minimum" && "Yes — Minimum payment"}
+                    {opt === "minimum" && "Minimum payment"}
                     {opt === "custom" && (
                       <span className="flex items-center gap-1.5">
-                        Yes — Custom
+                        Custom
                         <input type="number" value={card.ddAmount || ""} placeholder={`${currencySymbol(currency)}0`}
                           onClick={e => e.stopPropagation()}
                           onChange={e => updateCard(card.id, { dd: "custom", ddAmount: parseFloat(e.target.value) || 0 })}
@@ -415,23 +335,67 @@ function CardItem({ card, autoExpand, liveBal }: { card: CreditCard; autoExpand?
                           className="w-20 h-7 px-2 text-[0.8125rem] bg-transparent border border-border rounded-md outline-none focus:border-ring" />
                       </span>
                     )}
-                    {opt === "none" && "No"}
+                    {opt === "full" && "Full balance"}
+                    {opt === "none" && "No direct debit"}
                   </label>
                 ))}
               </div>
             </div>
 
-            {/* Statement History */}
+            {/* Manual entry for manual cards */}
+            {card.source === "manual" && !liveBal && (
+              <div className="col-span-2 border-t border-border pt-3 mt-1">
+                <Label className="mb-2">Add Debit / Credit</Label>
+                <div className="flex items-center gap-2">
+                  <div className="flex rounded-md border border-border overflow-hidden">
+                    <button
+                      onClick={() => setEntryType("debit")}
+                      className={cn("px-2.5 py-1.5 text-xs font-medium transition-colors",
+                        entryType === "debit" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Minus className="w-3 h-3 inline mr-1" />Debit
+                    </button>
+                    <button
+                      onClick={() => setEntryType("credit")}
+                      className={cn("px-2.5 py-1.5 text-xs font-medium transition-colors",
+                        entryType === "credit" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Plus className="w-3 h-3 inline mr-1" />Credit
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={entryAmount}
+                    onChange={e => setEntryAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="flex-1 h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring tabular-nums"
+                  />
+                  <button
+                    onClick={handleAddEntry}
+                    disabled={!entryAmount || parseFloat(entryAmount) <= 0}
+                    className="h-8 px-3 bg-foreground text-background rounded-md text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Monthly Records History */}
             <div className="col-span-2 border-t border-border pt-3 mt-1">
               <div className="flex items-center justify-between mb-2">
-                <Label>Statement History</Label>
+                <Label>Monthly History</Label>
                 <div className="flex gap-1.5">
-                  {sortedStatements.length > 2 && (
+                  {sortedRecords.length > 2 && (
                     <button
                       onClick={() => setShowHistory(!showHistory)}
                       className="text-[0.6875rem] text-muted-foreground hover:text-foreground px-2 py-1 rounded-md transition-colors"
                     >
-                      {showHistory ? "Show less" : `Show all (${sortedStatements.length})`}
+                      {showHistory ? "Show less" : `Show all (${sortedRecords.length})`}
                     </button>
                   )}
                 </div>
@@ -472,14 +436,14 @@ function CardItem({ card, autoExpand, liveBal }: { card: CreditCard; autoExpand?
                 />
               </div>
 
-              {missing && (
+              {pastMissing.length > 0 && (
                 <div className="bg-warning/10 border border-warning/20 rounded-md px-2.5 py-2 mb-2">
                   <div className="flex items-center gap-1.5 text-[0.6875rem] text-warning font-medium mb-1.5">
                     <AlertTriangle className="w-3 h-3 shrink-0" />
-                    {missingMonths.length} missing statement{missingMonths.length !== 1 ? "s" : ""}
+                    {pastMissing.length} missing record{pastMissing.length !== 1 ? "s" : ""}
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {missingMonths.map(m => (
+                    {pastMissing.map(m => (
                       <button
                         key={m}
                         onClick={() => addMissingMonth(m)}
@@ -492,37 +456,33 @@ function CardItem({ card, autoExpand, liveBal }: { card: CreditCard; autoExpand?
                 </div>
               )}
 
-              {currentMonthMissing && (
-                <button
-                  onClick={() => addMissingMonth(cm)}
-                  className="w-full text-left bg-primary/5 border border-primary/20 rounded-md px-2.5 py-2 mb-2 hover:bg-primary/10 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-[0.6875rem] font-medium text-primary">
-                      + Add {formatMonthLabel(cm)} — track live spending
-                    </div>
-                    <span className="text-[0.625rem] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">Current</span>
-                  </div>
-                </button>
-              )}
-
               <div className="space-y-1.5">
-                {(showHistory ? sortedStatements : sortedStatements.slice(0, 2)).map(entry => (
-                  <StatementRow
-                    key={entry.month}
-                    entry={entry}
+                {(showHistory ? sortedRecords : sortedRecords.slice(0, 2)).map(record => (
+                  <RecordRow
+                    key={record.month}
+                    record={record}
                     card={card}
                     currency={currency}
-                    isCurrentMonth={entry.month === cm}
-                    onUpdate={updates => handleStatementUpdate(entry.month, updates)}
-                    onDelete={() => handleDeleteStatement(entry.month)}
-                    onRecalc={() => recalcInterest(entry.month)}
+                    isCurrentMonth={record.month === cm}
+                    onUpdate={updates => handleRecordUpdate(record.month, updates)}
+                    onDelete={() => handleDeleteRecord(record.month)}
                   />
                 ))}
-                {sortedStatements.length === 0 && (
-                  <div className="text-xs text-muted-foreground italic py-2">No statements yet — click a missing month above or upload a PDF.</div>
+                {sortedRecords.length === 0 && (
+                  <div className="text-xs text-muted-foreground italic py-2">No records yet — add a debit or credit above to start tracking.</div>
                 )}
               </div>
+            </div>
+
+            {/* Delete card */}
+            <div className="col-span-2 border-t border-border pt-3 mt-1">
+              <button onClick={handleDelete}
+                className={cn("w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-md transition-colors",
+                  confirmDelete > 0 ? "bg-destructive/10 text-destructive border border-destructive/30" : "text-muted-foreground hover:text-destructive hover:bg-destructive/5"
+                )}>
+                <Trash2 className="w-3.5 h-3.5" />
+                {confirmDelete === 0 ? "Delete card" : confirmDelete === 1 ? "Tap again to confirm" : "Final confirmation — delete forever"}
+              </button>
             </div>
           </div>
         </div>
@@ -585,7 +545,6 @@ function CardsContent() {
       .catch(() => {})
   }, [])
 
-  // Match TrueLayer cards to local cards by last 4 digits
   const liveBalMap = new Map<number, LiveBal>()
   for (const card of cards) {
     const match = tlCards.find(tc => tc.partialNumber && tc.partialNumber.endsWith(card.last4))

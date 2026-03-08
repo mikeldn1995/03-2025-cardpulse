@@ -1,14 +1,13 @@
 "use client"
 
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutGrid, CreditCard, BarChart3, Upload, Settings } from "lucide-react"
+import { LayoutGrid, CreditCard, BarChart3, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
   { href: "/cards",     label: "Cards",     icon: CreditCard },
   { href: "/forecast",  label: "Forecast",  icon: BarChart3 },
-  { href: "/upload",    label: "Upload",    icon: Upload },
   { href: "/settings",  label: "Settings",  icon: Settings },
 ]
 
