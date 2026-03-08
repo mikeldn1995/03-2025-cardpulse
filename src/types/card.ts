@@ -21,6 +21,7 @@ export interface CreditCard {
   ddAmount: number
   address: string
   paymentDay: number // 1-28
+  statementDay: number // 1-28, day the statement cycle closes
   statements: StatementEntry[]
 }
 

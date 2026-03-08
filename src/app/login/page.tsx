@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useStore } from "@/lib/store"
 import { useToast } from "@/components/toast"
@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [step, setStep] = useState<"email" | "otp">("email")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const verifyingRef = useRef(false)
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,15 +38,16 @@ export default function LoginPage() {
     }
   }
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const doVerify = useCallback(async (otpCode: string) => {
+    if (verifyingRef.current) return
+    verifyingRef.current = true
     setError("")
     setLoading(true)
     try {
       const res = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ email, code: otpCode }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Invalid code")
@@ -56,7 +58,19 @@ export default function LoginPage() {
       setError(err.message)
     } finally {
       setLoading(false)
+      verifyingRef.current = false
     }
+  }, [email, loginWithSession, toast, router])
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    doVerify(code)
+  }
+
+  const handleCodeChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, "").slice(0, 6)
+    setCode(cleaned)
+    if (cleaned.length === 6) doVerify(cleaned)
   }
 
   return (
@@ -106,9 +120,10 @@ export default function LoginPage() {
                 inputMode="numeric"
                 maxLength={6}
                 value={code}
-                onChange={e => setCode(e.target.value.replace(/\D/g, ""))}
+                onChange={e => handleCodeChange(e.target.value)}
                 required
                 autoFocus
+                autoComplete="one-time-code"
                 placeholder="000000"
                 className="w-full h-12 px-3 text-center text-lg tracking-[0.3em] font-mono bg-transparent border border-border rounded-lg outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
               />

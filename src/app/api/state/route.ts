@@ -33,6 +33,7 @@ export async function GET() {
         ddAmount: card.ddAmount,
         address: card.address,
         paymentDay: card.paymentDay,
+        statementDay: card.statementDay,
         statements: cardStatements.map((s) => ({
           month: s.month,
           spent: s.spent,
@@ -114,6 +115,7 @@ export async function PUT(req: Request) {
           ddAmount: card.ddAmount,
           address: card.address,
           paymentDay: card.paymentDay,
+          statementDay: card.statementDay ?? 1,
         }).where(eq(cards.id, card.id))
 
         // Replace statements
@@ -145,6 +147,7 @@ export async function PUT(req: Request) {
           ddAmount: card.ddAmount || 0,
           address: card.address || "",
           paymentDay: card.paymentDay || 5,
+          statementDay: card.statementDay || 1,
         }).returning()
 
         for (const st of card.statements || []) {

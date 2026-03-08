@@ -136,6 +136,7 @@ function CardItem({ card, autoExpand }: { card: CreditCard; autoExpand?: boolean
     if (isNaN(v)) return
     const updates: Partial<CreditCard> = {}
     if (field === "paymentDay") updates.paymentDay = Math.max(1, Math.min(28, Math.round(v)))
+    else if (field === "statementDay") updates.statementDay = Math.max(1, Math.min(28, Math.round(v)))
     else (updates as any)[field] = v
     updateCard(card.id, updates)
     toast("Saved")
@@ -374,6 +375,10 @@ function CardItem({ card, autoExpand }: { card: CreditCard; autoExpand?: boolean
             <div>
               <Label>Payment Date</Label>
               <div className="text-sm font-medium"><InlineEdit value={card.paymentDay} displayValue={`${ordinal(card.paymentDay)} of each month`} type="number" min="1" max="28" step="1" onSave={v => save("paymentDay", v)} inputClassName="w-12 text-center" /></div>
+            </div>
+            <div>
+              <Label>Statement Closes</Label>
+              <div className="text-sm font-medium"><InlineEdit value={card.statementDay} displayValue={`${ordinal(card.statementDay)} of each month`} type="number" min="1" max="28" step="1" onSave={v => save("statementDay", v)} inputClassName="w-12 text-center" /></div>
             </div>
 
             {/* Direct debit */}

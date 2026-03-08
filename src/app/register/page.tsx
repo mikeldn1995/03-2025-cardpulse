@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, ArrowRight, Check } from "lucide-react"
 import { useStore } from "@/lib/store"
@@ -30,6 +30,7 @@ export default function RegisterPage() {
 
   const [selectedCurrency, setSelectedCurrency] = useState<"GBP" | "USD" | "EUR">("GBP")
   const [selectedTheme, setSelectedTheme] = useState<"system" | "light" | "dark">("system")
+  const verifyingRef = useRef(false)
 
   const stepIndex = STEPS.findIndex(s => s.key === step)
 
@@ -55,14 +56,16 @@ export default function RegisterPage() {
     }
   }
 
-  const handleVerifyOtp = async () => {
+  const doVerify = useCallback(async (otpCode: string) => {
+    if (verifyingRef.current) return
+    verifyingRef.current = true
     setError("")
     setLoading(true)
     try {
       const res = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ email, code: otpCode }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Invalid code")
@@ -72,7 +75,16 @@ export default function RegisterPage() {
       setError(err.message)
     } finally {
       setLoading(false)
+      verifyingRef.current = false
     }
+  }, [email, name, loginWithSession])
+
+  const handleVerifyOtp = () => doVerify(code)
+
+  const handleCodeChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, "").slice(0, 6)
+    setCode(cleaned)
+    if (cleaned.length === 6) doVerify(cleaned)
   }
 
   const handlePreferencesNext = () => {
@@ -179,8 +191,9 @@ export default function RegisterPage() {
                 inputMode="numeric"
                 maxLength={6}
                 value={code}
-                onChange={e => setCode(e.target.value.replace(/\D/g, ""))}
+                onChange={e => handleCodeChange(e.target.value)}
                 autoFocus
+                autoComplete="one-time-code"
                 placeholder="000000"
                 className="w-full h-12 px-3 text-center text-lg tracking-[0.3em] font-mono bg-transparent border border-border rounded-lg outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
               />

@@ -44,6 +44,7 @@ export const cards = pgTable("cards", {
   ddAmount: real("dd_amount").notNull().default(0),
   address: text("address").notNull().default(""),
   paymentDay: integer("payment_day").notNull().default(5),
+  statementDay: integer("statement_day").notNull().default(1),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 })
 
