@@ -20,5 +20,6 @@ export const SEED_CARDS: CreditCard[] = cardsDb.cards.map(c => ({
   ddAmount: c.ddAmount,
   address: cardsDb.defaultAddress,
   paymentDay: c.paymentDay,
+  statementDay: 1,
   statements: [],
 }))
