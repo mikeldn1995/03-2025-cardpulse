@@ -13,7 +13,7 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+          background: "linear-gradient(135deg, #0A1628, #1B2A4A)",
           borderRadius: 38,
         }}
       >
@@ -25,15 +25,15 @@ export default function AppleIcon() {
           xmlns="http://www.w3.org/2000/svg"
         >
           <rect x="56" y="116" width="400" height="280" rx="32" fill="white" opacity="0.95" />
+          <rect x="116" y="166" width="64" height="48" rx="8" fill="#3b82f6" opacity="0.3" />
           <polyline
-            points="116,296 186,296 216,216 256,336 296,256 326,296 396,296"
+            points="56,296 156,296 196,216 256,356 316,236 356,296 456,296"
             fill="none"
-            stroke="#7c3aed"
+            stroke="#3b82f6"
             strokeWidth="22"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-          <rect x="116" y="166" width="64" height="48" rx="8" fill="#7c3aed" opacity="0.25" />
         </svg>
       </div>
     ),

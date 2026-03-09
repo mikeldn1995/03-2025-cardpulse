@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useStore } from "@/lib/store"
+import { Logo } from "@/components/logo"
 import { useToast } from "@/components/toast"
 import { ArrowLeft } from "lucide-react"
 
@@ -17,8 +18,8 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const verifyingRef = useRef(false)
 
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     setError("")
     setLoading(true)
     try {
@@ -74,14 +75,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center px-6 min-h-dvh">
+    <div className="min-h-dvh bg-[#0A1628] flex items-center justify-center px-6">
       <div className="w-full max-w-[360px]">
         <div className="text-center mb-10">
-          <div className="w-12 h-12 bg-foreground text-background rounded-lg inline-flex items-center justify-center text-xl font-bold mb-3">CP</div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <Logo size={48} variant="dark" className="mx-auto mb-4" />
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
             {step === "email" ? "Welcome back" : "Enter your code"}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-slate-400 mt-1.5">
             {step === "email"
               ? "Sign in with a one-time code sent to your email."
               : `We sent a 6-digit code to ${email}`}
@@ -91,22 +92,24 @@ export default function LoginPage() {
         {step === "email" ? (
           <form onSubmit={handleSendOtp} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1.5">Email</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Email
+              </label>
               <input
                 type="email"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 autoFocus
                 placeholder="you@email.com"
-                className="w-full h-10 px-3 text-sm bg-transparent border border-border rounded-lg outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
+                className="w-full h-11 px-3 text-sm bg-[#111D32] border border-slate-700 rounded-lg text-white placeholder:text-slate-600 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            {error && <p className="text-xs text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-10 bg-foreground text-background rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="w-full h-11 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
             >
               {loading ? "Sending..." : "Send sign-in code"}
             </button>
@@ -114,41 +117,47 @@ export default function LoginPage() {
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1.5">6-digit code</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                6-digit code
+              </label>
               <input
                 type="text"
                 inputMode="numeric"
                 maxLength={6}
                 value={code}
-                onChange={e => handleCodeChange(e.target.value)}
+                onChange={(e) => handleCodeChange(e.target.value)}
                 required
                 autoFocus
                 autoComplete="one-time-code"
                 placeholder="000000"
-                className="w-full h-12 px-3 text-center text-lg tracking-[0.3em] font-mono bg-transparent border border-border rounded-lg outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
+                className="w-full h-14 px-3 text-center text-lg tracking-[0.3em] font-mono bg-[#111D32] border border-slate-700 rounded-lg text-white placeholder:text-slate-600 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            {error && <p className="text-xs text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={loading || code.length !== 6}
-              className="w-full h-10 bg-foreground text-background rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="w-full h-11 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
             >
               {loading ? "Verifying..." : "Verify & sign in"}
             </button>
             <div className="flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => { setStep("email"); setCode(""); setError("") }}
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                onClick={() => {
+                  setStep("email")
+                  setCode("")
+                  setError("")
+                }}
+                className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1 transition-colors"
               >
                 <ArrowLeft className="w-3 h-3" /> Change email
               </button>
               <button
                 type="button"
-                onClick={handleSendOtp}
+                onClick={() => handleSendOtp()}
                 disabled={loading}
-                className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                className="text-xs text-slate-500 hover:text-slate-300 disabled:opacity-50 transition-colors"
               >
                 Resend code
               </button>
@@ -156,10 +165,13 @@ export default function LoginPage() {
           </form>
         )}
 
-        <div className="text-center mt-6">
-          <p className="text-[0.8125rem] text-muted-foreground">
-            Don't have an account?{" "}
-            <button onClick={() => router.push("/register")} className="font-medium text-foreground underline underline-offset-2">
+        <div className="text-center mt-8">
+          <p className="text-[0.8125rem] text-slate-500">
+            Don&apos;t have an account?{" "}
+            <button
+              onClick={() => router.push("/register")}
+              className="font-medium text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
+            >
               Create one
             </button>
           </p>

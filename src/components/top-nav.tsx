@@ -1,24 +1,24 @@
 "use client"
 
-import { usePathname } from "next/navigation"
-
-const PAGE_TITLES: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/cards": "My Cards",
-  "/forecast": "Forecast",
-  "/settings": "Settings",
-}
+import { useStore } from "@/lib/store"
+import { Logo } from "@/components/logo"
+import { getGreeting } from "@/lib/utils"
 
 export function TopNav() {
-  const pathname = usePathname()
-  const title = Object.entries(PAGE_TITLES).find(([path]) => pathname.startsWith(path))?.[1] || "CardPulse"
+  const { userName } = useStore()
+  const greeting = getGreeting(userName || "there")
 
   return (
-    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border px-4 h-12 flex items-center gap-2.5">
-      <div className="w-7 h-7 bg-foreground text-background rounded-md inline-flex items-center justify-center text-[0.6875rem] font-bold shrink-0">
-        CP
+    <header className="sticky top-0 z-40 bg-[#0A1628] px-4 h-14 flex items-center justify-between">
+      <div className="flex items-center gap-2.5">
+        <Logo size={28} variant="dark" />
+        <span className="text-sm font-bold tracking-tight text-white">
+          CardPulse
+        </span>
       </div>
-      <span className="text-sm font-semibold tracking-tight">{title}</span>
+      <span className="text-xs text-white/60 truncate max-w-[180px]">
+        {greeting}
+      </span>
     </header>
   )
 }

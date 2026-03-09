@@ -2,439 +2,365 @@
 
 import { useState, useMemo } from "react"
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine
+  AreaChart, Area, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, ReferenceLine,
 } from "recharts"
+import {
+  TrendingDown, ChevronDown, Clock, PiggyBank,
+  Zap, CreditCard, Home, HandCoins, Landmark,
+} from "lucide-react"
 import { useStore } from "@/lib/store"
-import { computeForecast, ForecastData, CardForecast } from "@/lib/forecast"
-import { fmt, cn, currencySymbol, getBalance, getIssuerColor } from "@/lib/utils"
+import { isDebtAccount, formatCurrency, getEffectiveApr, getInstitutionColor } from "@/lib/utils"
+import { generateForecast } from "@/lib/forecast"
+import type { Account } from "@/types"
+
+const CATEGORY_ICONS: Record<string, typeof CreditCard> = {
+  credit_card: CreditCard,
+  loan: HandCoins,
+  mortgage: Home,
+  current_account: Landmark,
+}
 
 export default function ForecastPage() {
-  const { cards, forecastMonthly, setForecastMonthly, currency } = useStore()
-  const [inputVal, setInputVal] = useState(forecastMonthly.toString())
-  const [extraPayment, setExtraPayment] = useState(0)
+  const { accounts, baseCurrency } = useStore()
+  const debtAccounts = useMemo(() => accounts.filter(isDebtAccount), [accounts])
+
+  const [extraMonthly, setExtraMonthly] = useState(0)
   const [breakdownOpen, setBreakdownOpen] = useState(false)
 
-  const totalBal = cards.reduce((s, c) => s + getBalance(c), 0)
-  const sym = currencySymbol(currency)
-
-  // Base forecast with current monthly payment
-  const fc = useMemo(
-    () => computeForecast(cards, forecastMonthly),
-    [cards, forecastMonthly]
+  const forecast = useMemo(
+    () => generateForecast(debtAccounts, extraMonthly),
+    [debtAccounts, extraMonthly]
   )
 
-  // "What if" forecast with extra payment
-  const fcExtra = useMemo(
-    () => (extraPayment > 0 ? computeForecast(cards, forecastMonthly + extraPayment) : null),
-    [cards, forecastMonthly, extraPayment]
+  const forecastMin = useMemo(
+    () => (extraMonthly > 0 ? generateForecast(debtAccounts, 0) : forecast),
+    [debtAccounts, extraMonthly, forecast]
   )
 
-  const handleInput = (v: string) => {
-    setInputVal(v)
-    const n = parseFloat(v)
-    if (!isNaN(n) && n > 0) setForecastMonthly(n)
-  }
-
-  // Build chart data from active forecast (extra if slider > 0, else base)
-  const activeFc = fcExtra ?? fc
-  const data = useMemo(() => {
-    if (!activeFc) return []
-    return activeFc.labels.map((label, i) => ({
-      label,
-      balance: Math.round(activeFc.custom.totalBals[i] * 100) / 100,
+  // Build chart data with both lines
+  const chartData = useMemo(() => {
+    return forecast.custom.map((p, i) => ({
+      label: p.label,
+      custom: Math.round(p.totalDebt * 100) / 100,
+      minimum: Math.round((forecastMin.minimum[i]?.totalDebt ?? 0) * 100) / 100,
     }))
-  }, [activeFc])
-
-  // Promo expiry markers
-  const promoMarkers = useMemo(() => {
-    if (!activeFc || data.length === 0) return []
-    const now = new Date()
-    const markers: { label: string; issuer: string }[] = []
-    const seen = new Set<string>()
-
-    cards.forEach(c => {
-      if (c.aprPromo === null || !c.promoUntil) return
-      const expiry = new Date(c.promoUntil)
-      if (expiry <= now) return
-      const monthsAway =
-        (expiry.getFullYear() - now.getFullYear()) * 12 +
-        (expiry.getMonth() - now.getMonth())
-      if (monthsAway < 1 || monthsAway > data.length) return
-      const labelIdx = monthsAway - 1
-      const label = data[labelIdx]?.label
-      if (!label || seen.has(label)) return
-      seen.add(label)
-      markers.push({ label, issuer: c.issuer })
-    })
-    return markers
-  }, [cards, data, activeFc])
+  }, [forecast, forecastMin])
 
   const tickInterval =
-    data.length > 48 ? 11 : data.length > 24 ? 5 : data.length > 12 ? 2 : 0
+    chartData.length > 48 ? 11 : chartData.length > 24 ? 5 : chartData.length > 12 ? 2 : 0
 
   const formatY = (v: number) =>
-    `${sym}${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toFixed(0)}`
-  const tooltipFmt = (v: number) => fmt(v, currency)
+    v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v.toFixed(0)}`
 
-  // Summary stats
-  const payoffMonths = activeFc?.payoffMonthCustom ?? null
-  const totalInterest = activeFc?.totalInterestCustom ?? 0
-  const paidOff = activeFc?.custom.paidOff ?? false
-  const remainingBal = activeFc
-    ? activeFc.custom.totalBals[activeFc.custom.totalBals.length - 1] ?? 0
-    : 0
+  // Summary calculations
+  const monthsSavedRaw =
+    extraMonthly > 0
+      ? (forecastMin.payoffMonthMinimum ?? forecastMin.minimum.length) -
+        (forecast.payoffMonthCustom ?? forecast.custom.length)
+      : 0
+  const monthsSaved = Math.max(0, monthsSavedRaw)
 
-  // Savings comparison when slider is active
   const interestSaved =
-    fc && fcExtra ? fc.totalInterestCustom - fcExtra.totalInterestCustom : 0
-  const monthsSaved =
-    fc && fcExtra
-      ? (fc.payoffMonthCustom ?? fc.custom.months.length) -
-        (fcExtra.payoffMonthCustom ?? fcExtra.custom.months.length)
+    extraMonthly > 0
+      ? Math.max(0, forecastMin.totalInterestMinimum - forecast.totalInterestCustom)
       : 0
 
-  // Per-card breakdown sorted by payoff date (longest first)
-  const perCardSorted = useMemo(() => {
-    if (!activeFc) return []
-    return [...activeFc.perCard].sort((a, b) => {
-      const aMonth = a.payoffMonth ?? 999
-      const bMonth = b.payoffMonth ?? 999
-      return bMonth - aMonth
-    })
-  }, [activeFc])
+  // Per-account breakdown sorted by payoff time (longest first)
+  const perAccountBreakdown = useMemo(() => {
+    if (debtAccounts.length === 0) return []
 
-  if (totalBal <= 0) {
+    return debtAccounts
+      .map((account) => {
+        const singleForecast = generateForecast([account], extraMonthly)
+        const singleMin = extraMonthly > 0 ? generateForecast([account], 0) : singleForecast
+
+        return {
+          account,
+          payoffMonth: singleForecast.payoffMonthCustom,
+          payoffMonthMin: singleMin.payoffMonthMinimum,
+          totalInterest: singleForecast.totalInterestCustom,
+          apr: getEffectiveApr(account),
+        }
+      })
+      .sort((a, b) => (b.payoffMonth ?? 999) - (a.payoffMonth ?? 999))
+  }, [debtAccounts, extraMonthly])
+
+  // ── Empty State ───────────────────────────────────────────
+  if (debtAccounts.length === 0) {
     return (
-      <>
-        <div className="pb-3">
-          <p className="text-[0.8125rem] text-muted-foreground">
-            No balances to forecast
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div
+          className="w-full rounded-2xl p-8 text-center"
+          style={{ backgroundColor: "#1B2A4A" }}
+        >
+          <div
+            className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full"
+            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
+          >
+            <PiggyBank className="h-7 w-7 text-emerald-400" />
+          </div>
+          <h2 className="mb-2 text-lg font-semibold text-white">
+            No debts to forecast
+          </h2>
+          <p className="text-sm text-slate-400">
+            You&apos;re debt-free! Nothing to project here.
           </p>
         </div>
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-          All balances are zero -- nothing to project.
-        </div>
-      </>
+      </div>
     )
   }
 
+  const totalDebt = debtAccounts.reduce((s, a) => s + Math.abs(a.balance), 0)
+
   return (
-    <>
-      <div className="pb-3">
-        <p className="text-[0.8125rem] text-muted-foreground">
-          Project your repayment timeline
+    <div className="space-y-4 pb-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-lg font-bold text-white">Payoff Forecast</h1>
+        <p className="text-sm text-slate-400">
+          {debtAccounts.length} debt account{debtAccounts.length !== 1 ? "s" : ""} totalling{" "}
+          <span className="font-semibold text-white">
+            {formatCurrency(totalDebt, baseCurrency)}
+          </span>
         </p>
       </div>
 
-      {/* Monthly payment input */}
-      <div className="bg-card border border-border rounded-lg p-4 mb-4">
-        <label className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium block mb-1.5">
-          Monthly Repayment
-        </label>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">
-            {sym}
-          </span>
-          <input
-            type="number"
-            min="1"
-            step="50"
-            value={inputVal}
-            onChange={e => handleInput(e.target.value)}
-            className="h-9 w-28 px-3 text-sm bg-background border border-border rounded-md outline-none focus:border-ring tabular-nums"
-          />
-          <span className="text-xs text-muted-foreground">
-            / month across all cards
-          </span>
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl p-4" style={{ backgroundColor: "#1B2A4A" }}>
+          <div className="flex items-center gap-2 mb-2">
+            <Clock className="w-4 h-4 text-[hsl(217,70%,50%)]" />
+            <span className="text-[0.6875rem] uppercase tracking-wider text-slate-400 font-medium">
+              {forecast.payoffMonthCustom !== null ? "Debt-free in" : "Payoff timeline"}
+            </span>
+          </div>
+          <div className="text-xl font-bold text-white">
+            {forecast.payoffMonthCustom !== null ? (
+              <>
+                {forecast.payoffMonthCustom}{" "}
+                <span className="text-sm font-medium text-slate-400">
+                  {forecast.payoffMonthCustom === 1 ? "month" : "months"}
+                </span>
+              </>
+            ) : (
+              <span className="text-sm text-red-400">Not within 5 years</span>
+            )}
+          </div>
         </div>
-        <div className="text-xs text-muted-foreground mt-2">
-          Total balance:{" "}
-          <span className="font-medium text-foreground">
-            {fmt(totalBal, currency)}
-          </span>
+        <div className="rounded-2xl p-4" style={{ backgroundColor: "#1B2A4A" }}>
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingDown className="w-4 h-4 text-[hsl(217,70%,50%)]" />
+            <span className="text-[0.6875rem] uppercase tracking-wider text-slate-400 font-medium">
+              Total Interest
+            </span>
+          </div>
+          <div className="text-xl font-bold text-white">
+            {formatCurrency(forecast.totalInterestCustom, baseCurrency)}
+          </div>
         </div>
       </div>
 
-      {/* Stale manual cards warning */}
-      {fc && fc.staleManualCount > 0 && (
-        <div className="bg-warning/10 border border-warning/20 rounded-lg px-3 py-2 mb-3">
-          <div className="text-xs text-warning font-medium">
-            Forecast may be inaccurate -- {fc.staleManualCount} manual{" "}
-            {fc.staleManualCount === 1 ? "card hasn't" : "cards haven't"} been
-            updated recently
-          </div>
-        </div>
-      )}
-
-      {/* Promo expiry notice */}
-      {promoMarkers.length > 0 && (
-        <div className="bg-warning/10 border border-warning/20 rounded-lg px-3 py-2 mb-3">
-          <div className="text-[0.6875rem] font-medium text-warning mb-0.5">
-            Promo Rate Expiry
-          </div>
-          {promoMarkers.map(m => (
-            <div key={m.label} className="text-xs text-muted-foreground">
-              {m.issuer} promo ends {m.label} -- interest will increase
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Summary stats */}
-      {activeFc && (
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-card border border-border rounded-lg p-3">
-            <div className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              {paidOff ? "Debt-free in" : "Payoff timeline"}
-            </div>
-            <div className="text-lg font-semibold">
-              {paidOff && payoffMonths !== null ? (
-                <>
-                  {payoffMonths} {payoffMonths === 1 ? "month" : "months"}
-                </>
-              ) : (
-                <span className="text-destructive text-sm">
-                  Not repaid within 5 years
-                </span>
-              )}
-            </div>
-            {!paidOff && (
-              <div className="text-xs text-muted-foreground mt-0.5">
-                Remaining: {fmt(remainingBal, currency)}
-              </div>
-            )}
-          </div>
-          <div className="bg-card border border-border rounded-lg p-3">
-            <div className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              Total interest
-            </div>
-            <div className="text-lg font-semibold">
-              {fmt(totalInterest, currency)}
-            </div>
-            {!paidOff && (
-              <div className="text-xs text-muted-foreground mt-0.5">
-                Over 5 years
-              </div>
+      {/* Interest saved banner when extra > 0 */}
+      {extraMonthly > 0 && interestSaved > 0 && (
+        <div
+          className="rounded-xl px-4 py-3 flex items-start gap-3"
+          style={{ backgroundColor: "rgba(16, 185, 129, 0.12)" }}
+        >
+          <PiggyBank className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-emerald-400">
+              {formatCurrency(interestSaved, baseCurrency)} saved in interest
+            </p>
+            {monthsSaved > 0 && (
+              <p className="text-xs text-slate-400 mt-0.5">
+                Debt-free {monthsSaved} {monthsSaved === 1 ? "month" : "months"} sooner
+              </p>
             )}
           </div>
         </div>
       )}
 
-      {/* Payoff chart */}
-      {activeFc && data.length > 0 && (
-        <div className="bg-card border border-border rounded-lg p-3 mb-4">
-          <div className="text-xs font-medium mb-2">Balance Over Time</div>
+      {/* Area Chart */}
+      {chartData.length > 1 && (
+        <div className="rounded-2xl p-4" style={{ backgroundColor: "#1B2A4A" }}>
+          <p className="text-xs font-medium text-white mb-3">Total Debt Over Time</p>
           <ResponsiveContainer width="100%" height={260}>
-            <AreaChart
-              data={data}
-              margin={{ top: 5, right: 5, left: -10, bottom: 5 }}
-            >
+            <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
               <defs>
-                <linearGradient id="payoffGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="0%"
-                    stopColor="hsl(142, 76%, 36%)"
-                    stopOpacity={0.3}
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor="hsl(142, 76%, 36%)"
-                    stopOpacity={0.02}
-                  />
+                <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="hsl(217, 70%, 50%)" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="hsl(217, 70%, 50%)" stopOpacity={0.02} />
+                </linearGradient>
+                <linearGradient id="minimumGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#64748B" stopOpacity={0.15} />
+                  <stop offset="100%" stopColor="#64748B" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 10, fill: "#94A3B8" }}
                 interval={tickInterval}
+                axisLine={false}
+                tickLine={false}
               />
-              <YAxis tickFormatter={formatY} tick={{ fontSize: 10 }} />
+              <YAxis
+                tickFormatter={formatY}
+                tick={{ fontSize: 10, fill: "#94A3B8" }}
+                axisLine={false}
+                tickLine={false}
+              />
               <Tooltip
-                formatter={tooltipFmt}
+                formatter={(value: number, name: string) => [
+                  formatCurrency(value, baseCurrency),
+                  name === "minimum" ? "Minimum payments" : "With extra",
+                ]}
                 contentStyle={{
                   fontSize: 12,
-                  borderRadius: 8,
-                  border: "1px solid hsl(var(--border))",
-                  background: "hsl(var(--card))",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  background: "#0F172A",
+                  color: "#fff",
                 }}
+                labelStyle={{ color: "#94A3B8" }}
               />
               <ReferenceLine
                 y={0}
-                stroke="hsl(var(--muted-foreground))"
+                stroke="rgba(255,255,255,0.1)"
                 strokeDasharray="4 4"
-                strokeWidth={1}
               />
-              {promoMarkers.map(m => (
-                <ReferenceLine
-                  key={m.label}
-                  x={m.label}
-                  stroke="hsl(38, 92%, 50%)"
-                  strokeDasharray="4 4"
+              {/* Minimum payments line (muted) */}
+              {extraMonthly > 0 && (
+                <Area
+                  type="monotone"
+                  dataKey="minimum"
+                  name="minimum"
+                  stroke="#64748B"
                   strokeWidth={1.5}
-                  label={{
-                    value: `${m.issuer} promo ends`,
-                    position: "top",
-                    fill: "hsl(38, 92%, 50%)",
-                    fontSize: 9,
-                  }}
+                  strokeDasharray="6 3"
+                  fill="url(#minimumGradient)"
+                  dot={false}
                 />
-              ))}
+              )}
+              {/* With extra / active line (primary blue) */}
               <Area
                 type="monotone"
-                dataKey="balance"
-                name="Balance"
-                stroke="hsl(142, 76%, 36%)"
+                dataKey="custom"
+                name="custom"
+                stroke="hsl(217, 70%, 50%)"
                 strokeWidth={2}
-                fill="url(#payoffGradient)"
+                fill="url(#forecastGradient)"
                 dot={false}
               />
             </AreaChart>
           </ResponsiveContainer>
+          {extraMonthly > 0 && (
+            <div className="flex items-center gap-4 mt-2 px-1">
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-0.5 bg-slate-500" style={{ borderTop: "1.5px dashed #64748B" }} />
+                <span className="text-[0.625rem] text-slate-400">Minimum</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: "hsl(217, 70%, 50%)" }} />
+                <span className="text-[0.625rem] text-slate-400">With extra</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* What-if slider */}
-      <div className="bg-card border border-border rounded-lg p-4 mb-4">
-        <label className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium block mb-2">
-          What if I paid extra per month?
+      {/* What-if Slider */}
+      <div className="rounded-2xl p-4" style={{ backgroundColor: "#1B2A4A" }}>
+        <label className="text-[0.6875rem] uppercase tracking-wider text-slate-400 font-medium block mb-3">
+          Extra monthly payment:{" "}
+          <span className="text-white font-semibold text-sm normal-case">
+            {formatCurrency(extraMonthly, baseCurrency)}
+          </span>
         </label>
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-muted-foreground">
-            {sym}0
-          </span>
+          <span className="text-xs text-slate-500">£0</span>
           <input
             type="range"
             min={0}
             max={500}
-            step={10}
-            value={extraPayment}
-            onChange={e => setExtraPayment(Number(e.target.value))}
-            className="flex-1 h-2 accent-foreground"
+            step={25}
+            value={extraMonthly}
+            onChange={(e) => setExtraMonthly(Number(e.target.value))}
+            className="flex-1 h-2 accent-[hsl(217,70%,50%)] rounded-full"
           />
-          <span className="text-sm font-medium text-muted-foreground">
-            {sym}500
-          </span>
+          <span className="text-xs text-slate-500">£500</span>
         </div>
-        <div className="text-sm font-semibold mt-2">
-          +{fmt(extraPayment, currency)}/month
-        </div>
-        {extraPayment > 0 && fc && fcExtra && (
-          <div className="mt-2 text-xs bg-success/10 border border-success/20 rounded-md px-3 py-2">
-            <span className="font-medium text-success">
-              {fmt(extraPayment, currency)} extra/month
-            </span>{" "}
-            <span className="text-muted-foreground">saves </span>
-            <span className="font-semibold">
-              {fmt(Math.max(0, interestSaved), currency)}
-            </span>
-            <span className="text-muted-foreground"> in interest</span>
-            {monthsSaved > 0 && (
-              <>
-                <span className="text-muted-foreground"> and </span>
-                <span className="font-semibold">
-                  {monthsSaved} {monthsSaved === 1 ? "month" : "months"}
-                </span>
-              </>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Smart strategy tip */}
-      {fc?.strategy && (
-        <div className="border-l-4 border-blue-500/60 bg-blue-500/5 rounded-r-lg px-3 py-2.5 mb-4">
-          <div className="text-[0.6875rem] uppercase tracking-wider text-blue-600 dark:text-blue-400 font-semibold mb-0.5">
-            Strategy Tip
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {fc.strategy.message}
-          </div>
-        </div>
-      )}
-
-      {/* Per-card breakdown */}
-      {perCardSorted.length > 0 && (
-        <div className="bg-card border border-border rounded-lg mb-4 overflow-hidden">
+      {/* Per-Account Breakdown */}
+      {perAccountBreakdown.length > 0 && (
+        <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "#1B2A4A" }}>
           <button
-            onClick={() => setBreakdownOpen(o => !o)}
-            className="w-full flex items-center justify-between px-4 py-3 text-left"
+            onClick={() => setBreakdownOpen((o) => !o)}
+            className="w-full flex items-center justify-between px-4 py-3.5 active:bg-white/5 transition-colors"
           >
-            <span className="text-xs font-medium">Per-Card Breakdown</span>
-            <svg
-              className={cn(
-                "w-4 h-4 text-muted-foreground transition-transform",
-                breakdownOpen && "rotate-180"
-              )}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
+            <span className="text-sm font-medium text-white">Per-Account Breakdown</span>
+            <ChevronDown
+              className={`w-4 h-4 text-slate-400 transition-transform ${
+                breakdownOpen ? "rotate-180" : ""
+              }`}
+            />
           </button>
           {breakdownOpen && (
-            <div className="border-t border-border divide-y divide-border">
-              {perCardSorted.map(card => {
-                const colors = getIssuerColor(card.issuer)
+            <div className="border-t border-white/5 divide-y divide-white/5">
+              {perAccountBreakdown.map(({ account, payoffMonth, totalInterest, apr }) => {
+                const Icon = CATEGORY_ICONS[account.category] || CreditCard
+                const bgColor = getInstitutionColor(account.institution)
                 const now = new Date()
                 const payoffDate =
-                  card.payoffMonth !== null
+                  payoffMonth !== null
                     ? new Date(
                         now.getFullYear(),
-                        now.getMonth() + card.payoffMonth,
+                        now.getMonth() + payoffMonth,
                         1
                       ).toLocaleDateString("en-GB", {
                         month: "short",
                         year: "numeric",
                       })
                     : null
+
                 return (
-                  <div key={card.cardId} className="px-4 py-3">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span
-                        className={cn(
-                          "inline-block w-2 h-2 rounded-full",
-                          colors.bg.replace("/10", "/60")
-                        )}
-                      />
-                      <span className={cn("text-xs font-semibold", colors.text)}>
-                        {card.issuer}
-                      </span>
-                      <span className="text-[0.6875rem] text-muted-foreground">
-                        {card.last4 ? `****${card.last4}` : ""}
+                  <div key={account.id} className="px-4 py-3.5">
+                    <div className="flex items-center gap-3 mb-2.5">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: bgColor }}
+                      >
+                        <Icon className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">
+                          {account.institution}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          ••{account.last4} &middot; {apr.toFixed(1)}% APR
+                        </p>
+                      </div>
+                      <span className="text-sm font-semibold text-white tabular-nums">
+                        {formatCurrency(Math.abs(account.balance), account.currency)}
                       </span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <div className="text-[0.625rem] text-muted-foreground uppercase tracking-wider">
-                          Balance
-                        </div>
-                        <div className="text-xs font-medium">
-                          {fmt(card.startBalance, currency)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[0.625rem] text-muted-foreground uppercase tracking-wider">
+                        <p className="text-[0.625rem] uppercase tracking-wider text-slate-500 mb-0.5">
                           Payoff
-                        </div>
-                        <div className="text-xs font-medium">
+                        </p>
+                        <p className="text-xs font-medium text-white">
                           {payoffDate ?? "5yr+"}
-                        </div>
+                        </p>
                       </div>
                       <div>
-                        <div className="text-[0.625rem] text-muted-foreground uppercase tracking-wider">
+                        <p className="text-[0.625rem] uppercase tracking-wider text-slate-500 mb-0.5">
                           Interest
-                        </div>
-                        <div className="text-xs font-medium">
-                          {fmt(card.totalInterest, currency)}
-                        </div>
+                        </p>
+                        <p className="text-xs font-medium text-white">
+                          {formatCurrency(totalInterest, account.currency)}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -444,6 +370,38 @@ export default function ForecastPage() {
           )}
         </div>
       )}
-    </>
+
+      {/* Strategy Tips */}
+      {forecast.strategies.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 px-1">
+            Strategy Tips
+          </p>
+          {forecast.strategies.map((tip, i) => (
+            <div
+              key={i}
+              className="rounded-2xl px-4 py-3.5"
+              style={{
+                backgroundColor: "rgba(59, 130, 246, 0.08)",
+                borderLeft: "3px solid hsl(217, 70%, 50%)",
+              }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Zap className="w-3.5 h-3.5 text-[hsl(217,70%,50%)]" />
+                <span className="text-sm font-semibold text-white">{tip.title}</span>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {tip.description}
+              </p>
+              {tip.savingsEstimate !== null && tip.savingsEstimate > 0 && (
+                <p className="text-xs font-semibold text-emerald-400 mt-1.5">
+                  Potential savings: {formatCurrency(tip.savingsEstimate, baseCurrency)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

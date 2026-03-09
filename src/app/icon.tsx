@@ -13,7 +13,7 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+          background: "linear-gradient(135deg, #0A1628, #1B2A4A)",
           borderRadius: 7,
         }}
       >
@@ -26,9 +26,9 @@ export default function Icon() {
         >
           <rect x="56" y="116" width="400" height="280" rx="32" fill="white" opacity="0.95" />
           <polyline
-            points="116,296 186,296 216,216 256,336 296,256 326,296 396,296"
+            points="56,296 156,296 196,216 256,356 316,236 356,296 456,296"
             fill="none"
-            stroke="#7c3aed"
+            stroke="#3b82f6"
             strokeWidth="28"
             strokeLinecap="round"
             strokeLinejoin="round"

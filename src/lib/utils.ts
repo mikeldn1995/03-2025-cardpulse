@@ -1,133 +1,113 @@
-import { clsx, type ClassValue } from "clsx"
+import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { CreditCard, MonthlyRecord } from "@/types/card"
+import type { Account, AccountCategory } from "@/types"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-const SYMBOLS: Record<string, string> = { GBP: "\u00a3", USD: "$", EUR: "\u20ac" }
+// ── Currency Formatting ───────────────────────────────────
 
-export function fmt(n: number, currency: string = "GBP") {
-  return SYMBOLS[currency] + n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const currencyFormatters: Record<string, Intl.NumberFormat> = {}
 
-export function fmtShort(n: number, currency: string = "GBP") {
-  return SYMBOLS[currency] + Math.round(n).toLocaleString("en-GB")
-}
-
-export function currencySymbol(currency: string) {
-  return SYMBOLS[currency] || "\u00a3"
-}
-
-export function getEffectiveAPR(card: CreditCard): number {
-  if (card.aprPromo !== null && card.promoUntil) {
-    if (new Date(card.promoUntil) > new Date()) return card.aprPromo
+export function formatCurrency(amount: number, currency = "GBP"): string {
+  if (!currencyFormatters[currency]) {
+    currencyFormatters[currency] = new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
   }
-  return card.aprRegular
+  return currencyFormatters[currency].format(amount)
 }
 
-/** Get the current balance of a card.
- *  If there are monthly records, use the last one's closingBalance.
- *  Otherwise, fall back to openingBalance.
- */
-export function getBalance(card: CreditCard): number {
-  if (card.monthlyRecords.length === 0) return card.openingBalance
-  const sorted = [...card.monthlyRecords].sort((a, b) => a.month.localeCompare(b.month))
-  return sorted[sorted.length - 1].closingBalance
-}
-
-/** Get opening balance for a specific month (previous month's closing or card opening) */
-export function getOpeningBalanceForMonth(card: CreditCard, month: string): number {
-  const sorted = [...card.monthlyRecords]
-    .filter(r => r.month < month)
-    .sort((a, b) => a.month.localeCompare(b.month))
-  if (sorted.length === 0) return card.openingBalance
-  return sorted[sorted.length - 1].closingBalance
-}
-
-/** Derive interest from a monthly record:
- *  interest = closingBalance - openingBalance + credits - debits
- *  If the result is negative or nonsensical, fall back to APR-based estimate.
- */
-export function deriveInterest(card: CreditCard, record: MonthlyRecord): number {
-  const opening = getOpeningBalanceForMonth(card, record.month)
-  const derived = record.closingBalance - opening + record.credits - record.debits
-  if (derived >= 0) return Math.round(derived * 100) / 100
-  // Fallback: APR-based
-  return estimateInterest(opening, card)
-}
-
-/** Estimate interest based on APR */
-export function estimateInterest(balance: number, card: CreditCard): number {
-  if (balance <= 0) return 0
-  const apr = getEffectiveAPR(card)
-  return Math.round(balance * (apr / 100 / 12) * 100) / 100
-}
-
-/** Compute closing balance from opening + debits - credits + interest */
-export function computeClosingBalance(opening: number, debits: number, credits: number, interest: number): number {
-  return Math.round((opening + debits - credits + interest) * 100) / 100
-}
-
-export function utilPercent(card: CreditCard): number {
-  const bal = getBalance(card)
-  return card.limit > 0 ? (bal / card.limit) * 100 : 0
-}
-
-export function currentMonth(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-}
-
-/** Returns all months from the month after openingMonth up to currentMonth */
-export function getExpectedMonths(card: CreditCard): string[] {
-  const cm = currentMonth()
-  const months: string[] = []
-  const [sy, sm] = card.openingMonth.split("-").map(Number)
-  let y = sy, m = sm
-  m++
-  if (m > 12) { m = 1; y++ }
-  while (`${y}-${String(m).padStart(2, "0")}` <= cm) {
-    months.push(`${y}-${String(m).padStart(2, "0")}`)
-    m++
-    if (m > 12) { m = 1; y++ }
+export function formatCompact(amount: number, currency = "GBP"): string {
+  const sym = currency === "GBP" ? "\u00a3" : currency === "EUR" ? "\u20ac" : "$"
+  if (Math.abs(amount) >= 1000) {
+    return `${sym}${(amount / 1000).toFixed(1)}k`
   }
-  return months
+  return formatCurrency(amount, currency)
 }
 
-/** Returns months that should have records but don't */
-export function getMissingMonths(card: CreditCard): string[] {
-  const expected = getExpectedMonths(card)
-  const have = new Set(card.monthlyRecords.map(r => r.month))
-  return expected.filter(m => !have.has(m))
+// ── Account Helpers ───────────────────────────────────────
+
+export function isDebtAccount(account: Account): boolean {
+  const debtCategories: AccountCategory[] = ["credit_card", "loan", "mortgage"]
+  return debtCategories.includes(account.category) || account.balance < 0
 }
 
-export function isMissingRecentRecord(card: CreditCard): boolean {
-  return getMissingMonths(card).length > 0
+export function getEffectiveApr(account: Account): number {
+  if (account.aprPromo != null && account.promoUntil) {
+    const promoEnd = new Date(account.promoUntil)
+    if (promoEnd > new Date()) return account.aprPromo
+  }
+  return account.aprRegular ?? 0
 }
 
-export function utilColor(pct: number): string {
-  if (pct < 30) return "text-success"
-  if (pct < 50) return "text-warning"
-  return "text-destructive"
+export function calcMinPayment(account: Account): number {
+  const bal = Math.abs(account.balance)
+  if (bal <= 0) return 0
+  if (account.minPaymentOverride != null) return account.minPaymentOverride
+  if (account.dd === "full") return bal
+  if (account.dd === "custom") return account.ddAmount
+  return Math.max(bal * 0.05, Math.min(25, bal))
 }
 
-export function utilBarColor(pct: number): string {
-  if (pct < 30) return "bg-success"
-  if (pct < 50) return "bg-warning"
-  return "bg-destructive"
+export function categoryLabel(cat: AccountCategory): string {
+  const labels: Record<AccountCategory, string> = {
+    credit_card: "Credit Cards",
+    current_account: "Current Accounts",
+    savings: "Savings",
+    isa: "ISAs",
+    investment: "Investments",
+    crypto: "Crypto",
+    loan: "Loans",
+    mortgage: "Mortgages",
+  }
+  return labels[cat] || cat
 }
 
-export function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"]
-  const v = n % 100
-  return n + (s[(v - 20) % 10] || s[v] || s[0])
+export function categoryIcon(cat: AccountCategory): string {
+  const icons: Record<AccountCategory, string> = {
+    credit_card: "CreditCard",
+    current_account: "Wallet",
+    savings: "PiggyBank",
+    isa: "Shield",
+    investment: "TrendingUp",
+    crypto: "Bitcoin",
+    loan: "HandCoins",
+    mortgage: "Home",
+  }
+  return icons[cat] || "Wallet"
 }
 
-export function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "\u2014"
-  return new Date(dateStr).toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+// ── Date Helpers ──────────────────────────────────────────
+
+export function daysAgo(dateStr: string): number {
+  const d = new Date(dateStr)
+  const now = new Date()
+  return Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+export function isStale(dateStr: string | null, thresholdDays = 35): boolean {
+  if (!dateStr) return true
+  return daysAgo(dateStr) > thresholdDays
+}
+
+export function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+export function formatDateShort(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  })
 }
 
 export function getGreeting(name: string): string {
@@ -137,70 +117,79 @@ export function getGreeting(name: string): string {
   return `Good evening, ${name}`
 }
 
-/** Issuer color accents for visual differentiation */
-const ISSUER_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  "amex": { bg: "bg-blue-500/10", text: "text-blue-600 dark:text-blue-400", border: "border-blue-500/20" },
-  "american express": { bg: "bg-blue-500/10", text: "text-blue-600 dark:text-blue-400", border: "border-blue-500/20" },
-  "barclays": { bg: "bg-teal-500/10", text: "text-teal-600 dark:text-teal-400", border: "border-teal-500/20" },
-  "barclaycard": { bg: "bg-teal-500/10", text: "text-teal-600 dark:text-teal-400", border: "border-teal-500/20" },
-  "hsbc": { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400", border: "border-red-500/20" },
-  "lloyds": { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", border: "border-green-500/20" },
-  "natwest": { bg: "bg-purple-500/10", text: "text-purple-600 dark:text-purple-400", border: "border-purple-500/20" },
-  "nationwide": { bg: "bg-indigo-500/10", text: "text-indigo-600 dark:text-indigo-400", border: "border-indigo-500/20" },
-  "virgin": { bg: "bg-rose-500/10", text: "text-rose-600 dark:text-rose-400", border: "border-rose-500/20" },
-  "virgin money": { bg: "bg-rose-500/10", text: "text-rose-600 dark:text-rose-400", border: "border-rose-500/20" },
-  "monzo": { bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400", border: "border-orange-500/20" },
-  "starling": { bg: "bg-cyan-500/10", text: "text-cyan-600 dark:text-cyan-400", border: "border-cyan-500/20" },
-  "capital one": { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400", border: "border-red-500/20" },
-  "chase": { bg: "bg-blue-600/10", text: "text-blue-700 dark:text-blue-300", border: "border-blue-600/20" },
-  "halifax": { bg: "bg-sky-500/10", text: "text-sky-600 dark:text-sky-400", border: "border-sky-500/20" },
-  "mbna": { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", border: "border-amber-500/20" },
-  "sainsburys": { bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400", border: "border-orange-500/20" },
-  "tesco": { bg: "bg-blue-500/10", text: "text-blue-600 dark:text-blue-400", border: "border-blue-500/20" },
-  "mastercard": { bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400", border: "border-orange-500/20" },
-  "visa": { bg: "bg-blue-500/10", text: "text-blue-600 dark:text-blue-400", border: "border-blue-500/20" },
+// ── Logo Helper ───────────────────────────────────────────
+
+export function getLogoUrl(domain: string | null): string | null {
+  if (!domain) return null
+  return `https://logo.clearbit.com/${domain}`
 }
 
-const DEFAULT_ISSUER_COLOR = { bg: "bg-foreground/5", text: "text-foreground/70", border: "border-foreground/10" }
-
-export function getIssuerColor(issuer: string): { bg: string; text: string; border: string } {
-  const key = issuer.toLowerCase().trim()
-  return ISSUER_COLORS[key] || DEFAULT_ISSUER_COLOR
+export function getInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
 }
 
-/** Calculate minimum payment: max(5% of balance, £25) or user override */
-export function calcMinPayment(card: CreditCard, balance?: number): number {
-  const bal = balance ?? getBalance(card)
-  if (bal <= 0) return 0
-  if (card.minPaymentOverride !== null && card.minPaymentOverride !== undefined) return card.minPaymentOverride
-  if (card.dd === "full") return bal
-  if (card.dd === "custom") return card.ddAmount
-  return Math.max(bal * 0.05, Math.min(25, bal))
+const institutionColors: Record<string, string> = {
+  barclays: "#00aeef",
+  hsbc: "#db0011",
+  lloyds: "#006a4d",
+  natwest: "#42145f",
+  halifax: "#004b8d",
+  santander: "#ec0000",
+  nationwide: "#003d6a",
+  monzo: "#ff5c3a",
+  starling: "#7433ff",
+  revolut: "#0075eb",
+  wise: "#9fe870",
+  amex: "#006fcf",
+  "american express": "#006fcf",
+  chase: "#117aca",
+  etoro: "#69c53e",
+  "virgin money": "#e10a0a",
+  "capital one": "#d03027",
+  tesco: "#00539f",
+  mbna: "#d4a843",
 }
 
-/** Check if a card needs attention (for sorting and dashboard alerts) */
-export function needsAttention(card: CreditCard, utilThreshold: number, liveBal?: { current: number; creditLimit: number }): string[] {
+export function getInstitutionColor(institution: string): string {
+  const key = institution.toLowerCase()
+  for (const [name, color] of Object.entries(institutionColors)) {
+    if (key.includes(name)) return color
+  }
+  let hash = 0
+  for (let i = 0; i < institution.length; i++) {
+    hash = institution.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const h = Math.abs(hash) % 360
+  return `hsl(${h}, 50%, 50%)`
+}
+
+// ── Alerts ────────────────────────────────────────────────
+
+export function getAccountAlerts(account: Account): string[] {
   const alerts: string[] = []
-  const bal = liveBal ? liveBal.current : getBalance(card)
-  const limit = liveBal ? liveBal.creditLimit : card.limit
-  const util = limit > 0 ? (bal / limit) * 100 : 0
 
-  if (util >= utilThreshold) alerts.push("high-util")
+  if (isStale(account.lastStatementDate)) alerts.push("stale-data")
 
-  if (card.source === "manual") {
-    const missing = getMissingMonths(card)
-    if (missing.filter(m => m !== currentMonth()).length > 0) alerts.push("missing-records")
+  if (account.category === "credit_card" && account.creditLimit) {
+    const util = (Math.abs(account.balance) / account.creditLimit) * 100
+    if (util >= 75) alerts.push("high-util")
   }
 
-  if (card.dd === "none" && bal > 0) alerts.push("no-dd")
+  if (account.balance < 0 && account.category === "current_account") {
+    alerts.push("overdrawn")
+  }
 
-  const currentDay = new Date().getDate()
-  const dayDiff = (card.paymentDay - currentDay + 30) % 30
-  if (bal > 0 && dayDiff <= 7) alerts.push("payment-due")
+  if (isDebtAccount(account) && account.dd === "none" && Math.abs(account.balance) > 0) {
+    alerts.push("no-dd")
+  }
 
-  if (card.aprPromo !== null && card.promoUntil) {
-    const expiry = new Date(card.promoUntil)
-    const daysToExpiry = (expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+  if (account.aprPromo != null && account.promoUntil) {
+    const daysToExpiry = (new Date(account.promoUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     if (daysToExpiry > 0 && daysToExpiry <= 30) alerts.push("promo-expiring")
   }
 

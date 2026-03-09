@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { StoreProvider } from "@/lib/store"
@@ -7,10 +7,9 @@ import { ToastProvider } from "@/components/toast"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "CardPulse — Credit Card Tracker",
-  description: "Track your credit cards, stay in control.",
+  title: "CardPulse — Financial Aggregator",
+  description: "Aggregate and track all your financial accounts in one place.",
   manifest: "/manifest.json",
-  themeColor: "#7c3aed",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -18,13 +17,18 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#0A1628",
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-      </head>
-      <body className={`${inter.className} min-h-dvh bg-background text-foreground antialiased`}>
+      <body className={`${inter.className} min-h-dvh bg-[#0A1628] text-white antialiased`}>
         <StoreProvider>
           <ToastProvider>
             <div className="max-w-[430px] mx-auto min-h-dvh relative flex flex-col">

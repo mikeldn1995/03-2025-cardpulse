@@ -1,19 +1,26 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from "react"
-import { CreditCard, MonthlyRecord, AppState } from "@/types/card"
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react"
+import type { Account, Transaction } from "@/types"
+
+interface AppState {
+  loggedIn: boolean
+  userName: string
+  userEmail: string
+  baseCurrency: string
+  onboarded: boolean
+  accounts: Account[]
+  transactions: Transaction[]
+}
 
 const DEFAULT_STATE: AppState = {
   loggedIn: false,
-  loginExpiry: null,
   userName: "",
   userEmail: "",
-  utilThreshold: 75,
-  currency: "GBP",
-  theme: "system",
-  cards: [],
-  forecastMonthly: 200,
+  baseCurrency: "GBP",
   onboarded: false,
+  accounts: [],
+  transactions: [],
 }
 
 interface StoreContextType extends AppState {
@@ -21,16 +28,10 @@ interface StoreContextType extends AppState {
   logout: () => void
   setUserName: (name: string) => void
   setOnboarded: (v: boolean) => void
-  addCard: (card: CreditCard) => void
-  updateCard: (id: number, updates: Partial<CreditCard>) => void
-  deleteCard: (id: number) => void
-  setCurrency: (c: AppState["currency"]) => void
-  setTheme: (t: AppState["theme"]) => void
-  setUtilThreshold: (n: number) => void
-  setForecastMonthly: (n: number) => void
-  resetCards: () => void
-  upsertRecord: (cardId: number, record: MonthlyRecord) => void
-  deleteRecord: (cardId: number, month: string) => void
+  setBaseCurrency: (c: string) => void
+  refreshAccounts: () => Promise<void>
+  refreshTransactions: (accountId?: number) => Promise<void>
+  refreshAll: () => Promise<void>
 }
 
 const StoreContext = createContext<StoreContextType | null>(null)
@@ -38,33 +39,29 @@ const StoreContext = createContext<StoreContextType | null>(null)
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(DEFAULT_STATE)
   const [hydrated, setHydrated] = useState(false)
-  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const stateRef = useRef(state)
-  stateRef.current = state
 
-  // Hydrate: check session cookie via API
   useEffect(() => {
     async function checkSession() {
       try {
         const res = await fetch("/api/auth/session")
         const data = await res.json()
         if (data.user) {
-          const stateRes = await fetch("/api/state")
-          if (stateRes.ok) {
-            const dbState = await stateRes.json()
-            setState({
-              loggedIn: true,
-              loginExpiry: Date.now() + 30 * 24 * 3600000,
-              userName: dbState.userName || data.user.name || "",
-              userEmail: data.user.email,
-              utilThreshold: dbState.utilThreshold ?? 75,
-              currency: dbState.currency ?? "GBP",
-              theme: (dbState.theme ?? "system") as AppState["theme"],
-              cards: dbState.cards || [],
-              forecastMonthly: dbState.forecastMonthly ?? 200,
-              onboarded: dbState.onboarded ?? false,
-            })
-          }
+          const [acctRes, txRes] = await Promise.all([
+            fetch("/api/accounts"),
+            fetch("/api/transactions?limit=100"),
+          ])
+          const accounts = acctRes.ok ? await acctRes.json() : []
+          const txData = txRes.ok ? await txRes.json() : []
+
+          setState({
+            loggedIn: true,
+            userName: data.user.name || "",
+            userEmail: data.user.email,
+            baseCurrency: data.user.baseCurrency || "GBP",
+            onboarded: data.user.onboarded ?? false,
+            accounts,
+            transactions: txData,
+          })
         }
       } catch {}
       setHydrated(true)
@@ -72,84 +69,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     checkSession()
   }, [])
 
-  // Debounced sync to API
-  const syncToApi = useCallback(() => {
-    if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
-    syncTimerRef.current = setTimeout(async () => {
-      const s = stateRef.current
-      if (!s.loggedIn) return
-      try {
-        await fetch("/api/state", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userName: s.userName,
-            currency: s.currency,
-            theme: s.theme,
-            utilThreshold: s.utilThreshold,
-            forecastMonthly: s.forecastMonthly,
-            onboarded: s.onboarded,
-            cards: s.cards,
-          }),
-        })
-      } catch (e) {
-        console.error("Failed to sync state:", e)
-      }
-    }, 1500)
-  }, [])
-
-  // Sync on state changes (after hydration)
-  useEffect(() => {
-    if (hydrated && state.loggedIn) {
-      syncToApi()
-    }
-  }, [state, hydrated, syncToApi])
-
-  // Theme
-  useEffect(() => {
-    if (!hydrated) return
-    const html = document.documentElement
-    html.classList.remove("dark", "light")
-    if (state.theme === "dark") html.classList.add("dark")
-    else if (state.theme === "light") html.classList.remove("dark")
-    else if (window.matchMedia("(prefers-color-scheme: dark)").matches) html.classList.add("dark")
-  }, [state.theme, hydrated])
-
   const loginWithSession = useCallback(async (user: { id: number; email: string; name: string }) => {
     try {
-      const stateRes = await fetch("/api/state")
-      if (stateRes.ok) {
-        const dbState = await stateRes.json()
-        setState({
-          loggedIn: true,
-          loginExpiry: Date.now() + 30 * 24 * 3600000,
-          userName: user.name || dbState.userName || "",
-          userEmail: user.email,
-          utilThreshold: dbState.utilThreshold ?? 75,
-          currency: dbState.currency ?? "GBP",
-          theme: (dbState.theme ?? "system") as AppState["theme"],
-          cards: dbState.cards || [],
-          forecastMonthly: dbState.forecastMonthly ?? 200,
-          onboarded: dbState.onboarded ?? false,
-        })
-        return
-      }
-    } catch {}
-    setState(prev => ({
-      ...prev,
-      loggedIn: true,
-      loginExpiry: Date.now() + 30 * 24 * 3600000,
-      userName: user.name,
-      userEmail: user.email,
-    }))
-  }, [])
+      const [acctRes, txRes] = await Promise.all([
+        fetch("/api/accounts"),
+        fetch("/api/transactions?limit=100"),
+      ])
+      const accounts = acctRes.ok ? await acctRes.json() : []
+      const txData = txRes.ok ? await txRes.json() : []
 
-  const setUserName = useCallback((userName: string) => {
-    setState(prev => ({ ...prev, userName }))
-  }, [])
-
-  const setOnboarded = useCallback((onboarded: boolean) => {
-    setState(prev => ({ ...prev, onboarded }))
+      setState({
+        loggedIn: true,
+        userName: user.name || "",
+        userEmail: user.email,
+        baseCurrency: "GBP",
+        onboarded: accounts.length > 0,
+        accounts,
+        transactions: txData,
+      })
+    } catch {
+      setState((prev) => ({
+        ...prev,
+        loggedIn: true,
+        userName: user.name,
+        userEmail: user.email,
+      }))
+    }
   }, [])
 
   const logout = useCallback(async () => {
@@ -157,75 +102,68 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState(DEFAULT_STATE)
   }, [])
 
-  const addCard = useCallback((card: CreditCard) => {
-    setState(prev => ({ ...prev, cards: [...prev.cards, card] }))
+  const setUserName = useCallback((userName: string) => {
+    setState((prev) => ({ ...prev, userName }))
+    fetch("/api/user", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: userName }),
+    }).catch(() => {})
   }, [])
 
-  const updateCard = useCallback((id: number, updates: Partial<CreditCard>) => {
-    setState(prev => ({
-      ...prev,
-      cards: prev.cards.map(c => c.id === id ? { ...c, ...updates } : c),
-    }))
+  const setOnboarded = useCallback((onboarded: boolean) => {
+    setState((prev) => ({ ...prev, onboarded }))
+    fetch("/api/user", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ onboarded }),
+    }).catch(() => {})
   }, [])
 
-  const deleteCard = useCallback((id: number) => {
-    setState(prev => ({ ...prev, cards: prev.cards.filter(c => c.id !== id) }))
+  const setBaseCurrency = useCallback((baseCurrency: string) => {
+    setState((prev) => ({ ...prev, baseCurrency }))
+    fetch("/api/user", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ baseCurrency }),
+    }).catch(() => {})
   }, [])
 
-  const setCurrency = useCallback((currency: AppState["currency"]) => {
-    setState(prev => ({ ...prev, currency }))
+  const refreshAccounts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/accounts")
+      if (res.ok) {
+        const accounts = await res.json()
+        setState((prev) => ({ ...prev, accounts }))
+      }
+    } catch {}
   }, [])
 
-  const setTheme = useCallback((theme: AppState["theme"]) => {
-    setState(prev => ({ ...prev, theme }))
+  const refreshTransactions = useCallback(async (accountId?: number) => {
+    try {
+      const url = accountId ? `/api/transactions?accountId=${accountId}&limit=200` : "/api/transactions?limit=100"
+      const res = await fetch(url)
+      if (res.ok) {
+        const transactions = await res.json()
+        setState((prev) => ({ ...prev, transactions }))
+      }
+    } catch {}
   }, [])
 
-  const setUtilThreshold = useCallback((utilThreshold: number) => {
-    setState(prev => ({ ...prev, utilThreshold }))
-  }, [])
-
-  const setForecastMonthly = useCallback((forecastMonthly: number) => {
-    setState(prev => ({ ...prev, forecastMonthly }))
-  }, [])
-
-  const resetCards = useCallback(() => {
-    setState(prev => ({ ...prev, cards: [] }))
-  }, [])
-
-  const upsertRecord = useCallback((cardId: number, record: MonthlyRecord) => {
-    setState(prev => ({
-      ...prev,
-      cards: prev.cards.map(c => {
-        if (c.id !== cardId) return c
-        const existing = c.monthlyRecords.findIndex(r => r.month === record.month)
-        const records = [...c.monthlyRecords]
-        if (existing >= 0) records[existing] = record
-        else records.push(record)
-        records.sort((a, b) => a.month.localeCompare(b.month))
-        return { ...c, monthlyRecords: records }
-      }),
-    }))
-  }, [])
-
-  const deleteRecord = useCallback((cardId: number, month: string) => {
-    setState(prev => ({
-      ...prev,
-      cards: prev.cards.map(c => {
-        if (c.id !== cardId) return c
-        return { ...c, monthlyRecords: c.monthlyRecords.filter(r => r.month !== month) }
-      }),
-    }))
-  }, [])
+  const refreshAll = useCallback(async () => {
+    await Promise.all([refreshAccounts(), refreshTransactions()])
+  }, [refreshAccounts, refreshTransactions])
 
   if (!hydrated) return null
 
   return (
-    <StoreContext.Provider value={{
-      ...state, loginWithSession, logout, setUserName, setOnboarded,
-      addCard, updateCard, deleteCard,
-      setCurrency, setTheme, setUtilThreshold, setForecastMonthly, resetCards,
-      upsertRecord, deleteRecord,
-    }}>
+    <StoreContext.Provider
+      value={{
+        ...state,
+        loginWithSession, logout, setUserName, setOnboarded, setBaseCurrency,
+        refreshAccounts, refreshTransactions, refreshAll,
+      }}
+    >
       {children}
     </StoreContext.Provider>
   )

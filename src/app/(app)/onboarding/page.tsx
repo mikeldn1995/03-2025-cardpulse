@@ -1,283 +1,305 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Wifi, ArrowRight, Check, AlertTriangle } from "lucide-react"
+import { useState, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
+import { ArrowRight, ArrowLeft, Upload, FileText, CheckCircle2, X } from "lucide-react"
 import { useStore } from "@/lib/store"
+import { Logo } from "@/components/logo"
 import { useToast } from "@/components/toast"
-import { cn } from "@/lib/utils"
-import { CreditCard as CreditCardType } from "@/types/card"
 
-type Step = "welcome" | "profile" | "add-card" | "done"
+type Step = "welcome" | "upload" | "done"
+
+interface UploadedFile {
+  name: string
+  status: "pending" | "uploading" | "success" | "error"
+  accountName?: string
+  error?: string
+}
 
 export default function OnboardingPage() {
-  const { userName, currency, setUserName, setCurrency, setOnboarded, addCard } = useStore()
+  const { setOnboarded, refreshAll } = useStore()
   const { toast } = useToast()
   const router = useRouter()
-  const searchParams = useSearchParams()
 
-  const tlError = searchParams.get("tl_error")
-  const tlConnected = searchParams.get("tl_connected")
+  const [step, setStep] = useState<Step>("welcome")
+  const [files, setFiles] = useState<UploadedFile[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [step, setStep] = useState<Step>(() => {
-    if (tlConnected === "1") return "done"
-    if (tlError) return "add-card"
-    return "welcome"
-  })
+  const currentStepIndex = step === "welcome" ? 0 : step === "upload" ? 1 : 2
 
-  const [nameInput, setNameInput] = useState(userName)
-  const [selectedCurrency, setSelectedCurrency] = useState(currency)
+  const handleFiles = useCallback(async (selectedFiles: FileList | File[]) => {
+    const fileArray = Array.from(selectedFiles)
+    if (fileArray.length === 0) return
 
-  // Card form
-  const [formIssuer, setFormIssuer] = useState("")
-  const [formLast4, setFormLast4] = useState("")
-  const [formLimit, setFormLimit] = useState("")
-  const [formBalance, setFormBalance] = useState("")
-  const [formAPR, setFormAPR] = useState("")
-  const [showManualForm, setShowManualForm] = useState(false)
+    const newFiles: UploadedFile[] = fileArray.map((f) => ({
+      name: f.name,
+      status: "uploading" as const,
+    }))
+    setFiles((prev) => [...prev, ...newFiles])
+    setUploading(true)
 
-  // If TrueLayer connected successfully, show done with success context
-  const [connectedViaBank, setConnectedViaBank] = useState(tlConnected === "1")
+    const formData = new FormData()
+    fileArray.forEach((f) => formData.append("files", f))
 
-  const handleProfileNext = () => {
-    const trimmed = nameInput.trim()
-    if (trimmed) setUserName(trimmed)
-    setCurrency(selectedCurrency)
-    setStep("add-card")
-  }
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData })
+      const data = await res.json()
 
-  const handleAddManualCard = () => {
-    const issuer = formIssuer.trim()
-    if (!issuer) { toast("Enter card issuer name"); return }
-
-    const card: CreditCardType = {
-      id: Date.now(),
-      issuer,
-      last4: formLast4 || "0000",
-      openingBalance: parseFloat(formBalance) || 0,
-      openingMonth: new Date().toISOString().substring(0, 7),
-      limit: parseFloat(formLimit) || 0,
-      aprRegular: parseFloat(formAPR) || 0,
-      aprPromo: null,
-      promoUntil: null,
-      dd: "none",
-      ddAmount: 0,
-      paymentDay: 5,
-      statementDay: 1,
-      source: "manual",
-      tlAccountId: null,
-      minPaymentOverride: null,
-      monthlyRecords: [],
+      if (!res.ok) {
+        setFiles((prev) =>
+          prev.map((f) =>
+            newFiles.some((nf) => nf.name === f.name)
+              ? { ...f, status: "error" as const, error: data.error || "Upload failed" }
+              : f
+          )
+        )
+        toast("Upload failed")
+      } else {
+        setFiles((prev) =>
+          prev.map((f) => {
+            if (newFiles.some((nf) => nf.name === f.name)) {
+              const parsed = data.results?.find((r: any) => r.fileName === f.name)
+              return {
+                ...f,
+                status: "success" as const,
+                accountName: parsed?.accountName || parsed?.institution || "Account",
+              }
+            }
+            return f
+          })
+        )
+        toast(`${fileArray.length} file${fileArray.length > 1 ? "s" : ""} uploaded`)
+      }
+    } catch {
+      setFiles((prev) =>
+        prev.map((f) =>
+          newFiles.some((nf) => nf.name === f.name)
+            ? { ...f, status: "error" as const, error: "Network error" }
+            : f
+        )
+      )
+      toast("Upload failed")
+    } finally {
+      setUploading(false)
     }
+  }, [toast])
 
-    addCard(card)
-    toast(`${issuer} added`)
-    setStep("done")
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      setDragOver(false)
+      handleFiles(e.dataTransfer.files)
+    },
+    [handleFiles]
+  )
+
+  const removeFile = (name: string) => {
+    setFiles((prev) => prev.filter((f) => f.name !== name))
   }
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     setOnboarded(true)
+    await refreshAll()
     router.push("/dashboard")
   }
 
+  const successCount = files.filter((f) => f.status === "success").length
+
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center px-4">
-      {step === "welcome" && (
-        <div className="w-full max-w-sm text-center space-y-6">
-          <div className="w-16 h-16 bg-foreground text-background rounded-2xl inline-flex items-center justify-center text-2xl font-bold mx-auto">
-            CP
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Welcome to CardPulse</h1>
-            <p className="text-sm text-muted-foreground mt-2">
-              Track your credit cards, monitor balances, and forecast your repayment timeline.
-            </p>
-          </div>
-          <button
-            onClick={() => setStep("profile")}
-            className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium bg-foreground text-background rounded-lg hover:opacity-90 transition-opacity"
-          >
-            Get Started
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+    <div className="min-h-dvh bg-[#0A1628] flex flex-col">
+      {/* Progress dots */}
+      <div className="flex items-center justify-center gap-2 pt-8 pb-2">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className={`h-2 rounded-full transition-all ${
+              i === currentStepIndex
+                ? "w-8 bg-blue-500"
+                : i < currentStepIndex
+                  ? "w-2 bg-blue-500/60"
+                  : "w-2 bg-slate-700"
+            }`}
+          />
+        ))}
+      </div>
 
-      {step === "profile" && (
-        <div className="w-full max-w-sm space-y-6">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight">About you</h2>
-            <p className="text-sm text-muted-foreground mt-1">Quick setup before we begin.</p>
-          </div>
-
-          <div className="space-y-4">
+      {/* Content */}
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        {/* Step 1: Welcome */}
+        {step === "welcome" && (
+          <div className="w-full max-w-sm text-center space-y-8">
+            <Logo size={72} variant="dark" className="mx-auto" />
             <div>
-              <label className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium block mb-1.5">Your Name</label>
+              <h1 className="text-2xl font-bold text-white tracking-tight">
+                Welcome to CardPulse
+              </h1>
+              <p className="text-sm text-slate-400 mt-3 leading-relaxed max-w-xs mx-auto">
+                Your personal financial aggregator. Upload bank &amp; credit card
+                statements, and let AI do the rest.
+              </p>
+            </div>
+            <button
+              onClick={() => setStep("upload")}
+              className="w-full flex items-center justify-center gap-2 py-3.5 text-sm font-medium bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
+            >
+              Get Started
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Step 2: Upload */}
+        {step === "upload" && (
+          <div className="w-full max-w-sm space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-white tracking-tight">
+                Upload your statements
+              </h2>
+              <p className="text-sm text-slate-400 mt-1">
+                Drag and drop PDF or CSV statements, or pick files.
+              </p>
+            </div>
+
+            {/* Drop zone */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragOver(true)
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`relative flex flex-col items-center justify-center gap-3 py-12 px-4 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+                dragOver
+                  ? "border-blue-500 bg-blue-500/10"
+                  : "border-slate-600 bg-[#111D32] hover:border-slate-500"
+              }`}
+            >
+              <Upload
+                className={`w-8 h-8 ${dragOver ? "text-blue-400" : "text-slate-500"}`}
+              />
+              <div className="text-center">
+                <p className="text-sm font-medium text-slate-300">
+                  Drop files here or tap to browse
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  PDF or CSV statements
+                </p>
+              </div>
               <input
-                type="text"
-                value={nameInput}
-                onChange={e => setNameInput(e.target.value)}
-                placeholder="Enter your name"
-                autoFocus
-                className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md outline-none focus:border-ring"
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.csv,.PDF,.CSV"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files) handleFiles(e.target.files)
+                  e.target.value = ""
+                }}
               />
             </div>
 
-            <div>
-              <label className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium block mb-1.5">Currency</label>
-              <div className="flex gap-1">
-                {(["GBP", "USD", "EUR"] as const).map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setSelectedCurrency(c)}
-                    className={cn(
-                      "flex-1 py-2.5 text-sm font-medium rounded-md transition-colors",
-                      selectedCurrency === c
-                        ? "bg-foreground text-background"
-                        : "bg-secondary text-muted-foreground hover:text-foreground"
-                    )}
+            {/* File list */}
+            {files.length > 0 && (
+              <div className="space-y-2">
+                {files.map((f) => (
+                  <div
+                    key={f.name}
+                    className="flex items-center gap-3 py-2.5 px-3 bg-[#111D32] border border-slate-700/50 rounded-lg"
                   >
-                    {c}
-                  </button>
+                    <FileText
+                      className={`w-4 h-4 shrink-0 ${
+                        f.status === "success"
+                          ? "text-emerald-400"
+                          : f.status === "error"
+                            ? "text-red-400"
+                            : "text-slate-500"
+                      }`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-slate-300 truncate">{f.name}</div>
+                      {f.status === "uploading" && (
+                        <div className="text-xs text-slate-500">Processing...</div>
+                      )}
+                      {f.status === "success" && f.accountName && (
+                        <div className="text-xs text-emerald-400">{f.accountName}</div>
+                      )}
+                      {f.status === "error" && (
+                        <div className="text-xs text-red-400">{f.error}</div>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeFile(f.name)
+                      }}
+                      className="text-slate-600 hover:text-slate-400"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 ))}
               </div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleProfileNext}
-            className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium bg-foreground text-background rounded-lg hover:opacity-90 transition-opacity"
-          >
-            Next
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {step === "add-card" && (
-        <div className="w-full max-w-sm space-y-6">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight">Add your first card</h2>
-            <p className="text-sm text-muted-foreground mt-1">Connect your bank or enter card details manually.</p>
-          </div>
-
-          {tlError && (
-            <div className="flex items-start gap-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm">
-              <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
-              <div className="space-y-2">
-                <p className="text-foreground">{tlError}</p>
-                <div className="flex gap-3">
-                  <a
-                    href="/api/truelayer/connect"
-                    className="text-xs font-medium underline text-foreground"
-                  >
-                    Try again
-                  </a>
-                  <button
-                    onClick={() => setShowManualForm(true)}
-                    className="text-xs font-medium underline text-muted-foreground"
-                  >
-                    Skip to manual
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <a
-              href="/api/truelayer/connect"
-              className="w-full flex items-center gap-3 py-3 px-4 text-sm font-medium bg-success/10 border border-success/20 rounded-lg hover:bg-success/15 transition-colors"
-            >
-              <Wifi className="w-5 h-5 text-success" />
-              <div className="text-left">
-                <div>Connect your bank</div>
-                <div className="text-[0.6875rem] text-muted-foreground font-normal">Auto-import cards with live balances</div>
-              </div>
-            </a>
-
-            {!showManualForm ? (
-              <button
-                onClick={() => setShowManualForm(true)}
-                className="w-full text-xs text-muted-foreground underline py-1"
-              >
-                or add a card manually
-              </button>
-            ) : (
-              <>
-                <div className="text-center text-xs text-muted-foreground py-1">or add manually</div>
-                <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="col-span-2">
-                      <FieldLabel>Card Issuer</FieldLabel>
-                      <input type="text" value={formIssuer} onChange={e => setFormIssuer(e.target.value)} placeholder="e.g. Barclaycard"
-                        className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
-                    </div>
-                    <div>
-                      <FieldLabel>Last 4 Digits</FieldLabel>
-                      <input type="text" value={formLast4} onChange={e => setFormLast4(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1234" maxLength={4}
-                        className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring font-mono" />
-                    </div>
-                    <div>
-                      <FieldLabel>Credit Limit</FieldLabel>
-                      <input type="number" value={formLimit} onChange={e => setFormLimit(e.target.value)} placeholder="0"
-                        className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
-                    </div>
-                    <div>
-                      <FieldLabel>Current Balance</FieldLabel>
-                      <input type="number" value={formBalance} onChange={e => setFormBalance(e.target.value)} placeholder="0"
-                        className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
-                    </div>
-                    <div>
-                      <FieldLabel>APR (%)</FieldLabel>
-                      <input type="number" step="0.1" value={formAPR} onChange={e => setFormAPR(e.target.value)} placeholder="0"
-                        className="w-full h-8 px-2.5 text-sm bg-background border border-border rounded-md outline-none focus:border-ring" />
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleAddManualCard}
-                    className="w-full h-9 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
-                  >
-                    Add Card
-                  </button>
-                </div>
-              </>
             )}
-          </div>
 
-          <button onClick={() => setStep("done")} className="w-full text-xs text-muted-foreground underline">
-            Skip -- I'll add cards later
-          </button>
-        </div>
-      )}
+            {/* Navigation */}
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={() => setStep("welcome")}
+                className="flex items-center gap-1.5 py-3 px-4 text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </button>
+              <div className="flex-1" />
+              {files.some((f) => f.status === "success") ? (
+                <button
+                  onClick={() => setStep("done")}
+                  className="flex items-center gap-2 py-3 px-6 text-sm font-medium bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
+                >
+                  Continue
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => setStep("done")}
+                  className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  Skip for now
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
-      {step === "done" && (
-        <div className="w-full max-w-sm text-center space-y-6">
-          <div className="w-16 h-16 bg-success/10 text-success rounded-full inline-flex items-center justify-center mx-auto">
-            <Check className="w-8 h-8" />
+        {/* Step 3: Done */}
+        {step === "done" && (
+          <div className="w-full max-w-sm text-center space-y-8">
+            <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white tracking-tight">
+                You&apos;re all set!
+              </h2>
+              <p className="text-sm text-slate-400 mt-3 leading-relaxed">
+                {successCount > 0
+                  ? `${successCount} statement${successCount > 1 ? "s" : ""} imported successfully. Your accounts are ready to explore.`
+                  : "You can upload statements anytime from the Upload page."}
+              </p>
+            </div>
+            <button
+              onClick={handleFinish}
+              className="w-full flex items-center justify-center gap-2 py-3.5 text-sm font-medium bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
+            >
+              Go to Dashboard
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
-          <div>
-            <h2 className="text-xl font-bold tracking-tight">You're all set!</h2>
-            <p className="text-sm text-muted-foreground mt-2">
-              {connectedViaBank
-                ? "Your bank account has been connected. Cards will sync automatically."
-                : "You can always add more cards and connect your bank in Settings."
-              }
-            </p>
-          </div>
-          <button
-            onClick={handleFinish}
-            className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium bg-foreground text-background rounded-lg hover:opacity-90 transition-opacity"
-          >
-            Go to Dashboard
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <div className="text-[0.625rem] uppercase tracking-wider text-muted-foreground font-medium mb-1">{children}</div>
 }

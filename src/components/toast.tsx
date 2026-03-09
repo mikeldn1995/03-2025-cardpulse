@@ -21,7 +21,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ toast }}>
       {children}
       <div className={cn(
-        "fixed bottom-20 left-1/2 -translate-x-1/2 bg-foreground text-background text-sm font-medium px-4 py-2.5 rounded-lg z-[100] whitespace-nowrap transition-all duration-300",
+        "fixed bottom-20 left-1/2 -translate-x-1/2 bg-[#1B2A4A] text-white text-sm font-medium px-4 py-2.5 rounded-lg z-[100] whitespace-nowrap shadow-lg border border-white/10 transition-all duration-300",
         visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
       )}>
         {message}
