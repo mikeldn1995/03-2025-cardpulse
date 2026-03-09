@@ -330,23 +330,35 @@ export default function UploadPage() {
         body: JSON.stringify({ statements: confirmed }),
       })
 
+      const data = await res.json()
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        toast((err as { error?: string }).error || "Import failed")
+        const errMsg = data.error || "Import failed"
+        const details = data.details?.length ? `: ${data.details.join(", ")}` : ""
+        toast(`${errMsg}${details}`)
+        console.error("[confirm] Import error:", data)
         setConfirming(false)
         return
       }
 
-      const data = await res.json()
+      // Log per-statement errors (partial failures)
+      const failed = (data.results || []).filter((r: any) => r.accountId === 0 && r.error)
+      if (failed.length > 0) {
+        const errMsgs = failed.map((f: any) => `${f.institution}: ${f.error}`)
+        console.error("[confirm] Partial failures:", errMsgs)
+        toast(`${failed.length} statement(s) failed to import`)
+      }
+
       await refreshAll()
 
-      // Build import results summary
-      const summaryResults: ImportResult[] = (data.results || []).map((r: any, idx: number) => ({
+      // Build import results summary (only successful ones)
+      const successResults = (data.results || []).filter((r: any) => r.accountId !== 0)
+      const summaryResults: ImportResult[] = successResults.map((r: any, idx: number) => ({
         institution: r.institution || confirmed[idx]?.institution || "Unknown",
         accountName: confirmed[idx]?.accountName || "",
         last4: r.last4 || confirmed[idx]?.last4 || "",
         transactionsInserted: r.transactionsInserted || 0,
-        isNew: r.accountId !== 0 && !r.existing,
+        isNew: !r.existing,
       }))
 
       setImportResults(summaryResults)

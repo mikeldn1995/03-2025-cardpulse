@@ -18,12 +18,18 @@ export async function POST(req: NextRequest) {
   }
 
   const batchId = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
-  const results: { institution: string; last4: string; accountId: number; transactionsInserted: number; snapshotCreated: boolean }[] = []
+  const results: { institution: string; last4: string; accountId: number; transactionsInserted: number; snapshotCreated: boolean; existing: boolean; error?: string }[] = []
 
   for (const stmt of statements) {
     try {
+      // Validate required fields
+      if (!stmt.institution) throw new Error("Missing institution name")
+      if (!stmt.category) throw new Error("Missing account category")
+      if (!stmt.statementDate) throw new Error("Missing statement date")
+
       // Try to match existing account by institution + last4
       let accountId: number
+      let existing = false
 
       const existingAccounts = await db
         .select()
@@ -32,13 +38,14 @@ export async function POST(req: NextRequest) {
           and(
             eq(accounts.userId, userId),
             eq(accounts.institution, stmt.institution),
-            eq(accounts.last4, stmt.last4)
+            eq(accounts.last4, stmt.last4 || "")
           )
         )
         .limit(1)
 
       if (existingAccounts.length > 0) {
         accountId = existingAccounts[0].id
+        existing = true
 
         // Update account with latest statement data
         await db
@@ -63,18 +70,18 @@ export async function POST(req: NextRequest) {
           .values({
             userId,
             institution: stmt.institution,
-            institutionDomain: stmt.institutionDomain,
-            accountName: stmt.accountName,
+            institutionDomain: stmt.institutionDomain || null,
+            accountName: stmt.accountName || "",
             category: stmt.category,
-            last4: stmt.last4,
-            currency: stmt.currency,
-            balance: stmt.balance,
-            creditLimit: stmt.creditLimit,
-            interestCharged: stmt.interestCharged,
-            minimumPayment: stmt.minimumPayment,
-            paymentDueDate: stmt.paymentDueDate,
+            last4: stmt.last4 || "",
+            currency: stmt.currency || "GBP",
+            balance: stmt.balance ?? 0,
+            creditLimit: stmt.creditLimit ?? null,
+            interestCharged: stmt.interestCharged ?? null,
+            minimumPayment: stmt.minimumPayment ?? null,
+            paymentDueDate: stmt.paymentDueDate || null,
             lastStatementDate: stmt.statementDate,
-            aprRegular: stmt.aprDetected,
+            aprRegular: stmt.aprDetected ?? null,
             balanceUpdatedAt: new Date(),
           })
           .returning()
@@ -96,19 +103,19 @@ export async function POST(req: NextRequest) {
 
       // Insert transactions
       let transactionsInserted = 0
-      if (stmt.transactions.length > 0) {
+      if (stmt.transactions && stmt.transactions.length > 0) {
         const txValues = stmt.transactions.map((t) => ({
           accountId,
           userId,
           date: t.date,
-          description: t.description,
-          amount: t.amount,
-          category: t.category,
-          categoryConfidence: t.categoryConfidence,
+          description: t.description || "Unknown",
+          amount: Number(t.amount) || 0,
+          category: t.category || "Uncategorised",
+          categoryConfidence: t.categoryConfidence != null ? Number(t.categoryConfidence) : 0.5,
           source: "statement" as const,
           statementId: batchId,
           isTransfer: false,
-          needsReview: t.categoryConfidence < 0.6,
+          needsReview: (t.categoryConfidence ?? 0) < 0.6,
         }))
 
         await db.insert(transactions).values(txValues)
@@ -120,33 +127,46 @@ export async function POST(req: NextRequest) {
       await db.insert(balanceSnapshots).values({
         accountId,
         date: stmt.statementDate,
-        balance: stmt.balance,
-        creditLimit: stmt.creditLimit,
-        interestCharged: stmt.interestCharged,
-        minimumPayment: stmt.minimumPayment,
-        paymentDueDate: stmt.paymentDueDate,
-        statementPeriodStart: stmt.statementPeriodStart,
-        statementPeriodEnd: stmt.statementPeriodEnd,
+        balance: stmt.balance ?? 0,
+        creditLimit: stmt.creditLimit ?? null,
+        interestCharged: stmt.interestCharged ?? null,
+        minimumPayment: stmt.minimumPayment ?? null,
+        paymentDueDate: stmt.paymentDueDate || null,
+        statementPeriodStart: stmt.statementPeriodStart || null,
+        statementPeriodEnd: stmt.statementPeriodEnd || null,
         source: "statement",
       })
       snapshotCreated = true
 
       results.push({
         institution: stmt.institution,
-        last4: stmt.last4,
+        last4: stmt.last4 || "",
         accountId,
         transactionsInserted,
         snapshotCreated,
+        existing,
       })
     } catch (err: any) {
+      console.error(`[confirm] Error processing statement for ${stmt.institution} ****${stmt.last4}:`, err)
       results.push({
         institution: stmt.institution,
-        last4: stmt.last4,
+        last4: stmt.last4 || "",
         accountId: 0,
         transactionsInserted: 0,
         snapshotCreated: false,
+        existing: false,
+        error: err?.message || "Unknown error during import",
       })
     }
+  }
+
+  // Check if ALL statements failed
+  const allFailed = results.every((r) => r.accountId === 0)
+  if (allFailed) {
+    return NextResponse.json(
+      { error: "All imports failed", details: results.map((r) => r.error).filter(Boolean), batchId, results },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ batchId, results })
