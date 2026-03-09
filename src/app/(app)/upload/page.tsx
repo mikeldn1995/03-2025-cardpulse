@@ -5,37 +5,24 @@ import Link from "next/link"
 import { Upload, FileText, Check, AlertTriangle, X, Loader2, Clock, ArrowRight } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { useToast } from "@/components/toast"
-import { formatCurrency, categoryLabel } from "@/lib/utils"
-import { ACCOUNT_CATEGORIES } from "@/types"
-import type { ParsedStatement, AccountCategory } from "@/types"
+import { formatCurrency } from "@/lib/utils"
+import type { ParsedStatement } from "@/types"
 
 // ── Types ───────────────────────────────────────────────────
 interface FileStatus {
   file: File
-  state: "queued" | "uploading" | "parsing" | "done" | "error" | "password-needed"
+  state: "queued" | "uploading" | "parsing" | "parsed" | "confirming" | "done" | "error" | "password-needed"
   error?: string
   parsed?: ParsedStatement
   password?: string
-  rememberPassword?: boolean
   startedAt?: number
   elapsed?: number
+  accountId?: number
+  transactionsInserted?: number
+  isNew?: boolean
 }
 
-interface ReviewStatement {
-  filename: string
-  parsed: ParsedStatement
-  enabled: boolean
-}
-
-interface ImportResult {
-  institution: string
-  accountName: string
-  last4: string
-  transactionsInserted: number
-  isNew: boolean
-}
-
-type Phase = "drop" | "processing" | "review" | "success"
+type Phase = "drop" | "processing" | "success"
 
 const MAX_FILES = 15
 const MAX_SIZE_MB = 10
@@ -72,13 +59,11 @@ export default function UploadPage() {
 
   const [phase, setPhase] = useState<Phase>("drop")
   const [fileStatuses, setFileStatuses] = useState<FileStatus[]>([])
-  const [reviewStatements, setReviewStatements] = useState<ReviewStatement[]>([])
-  const [confirming, setConfirming] = useState(false)
   const [dragOver, setDragOver] = useState(false)
-  const [importResults, setImportResults] = useState<ImportResult[]>([])
 
   const inputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const confirmingRef = useRef(false)
 
   // Elapsed time ticker for active files
   useEffect(() => {
@@ -103,31 +88,100 @@ export default function UploadPage() {
     }
   }, [phase])
 
-  // Auto-transition to review when all files resolved
+  // Auto-confirm when all files are parsed — this is the key fix
   useEffect(() => {
     if (phase !== "processing") return
+    if (confirmingRef.current) return
+
     const allResolved = fileStatuses.length > 0 && fileStatuses.every(
-      (s) => s.state === "done" || s.state === "error"
+      (s) => s.state === "parsed" || s.state === "done" || s.state === "error" || s.state === "confirming"
     )
     if (!allResolved) return
 
-    const reviewable = fileStatuses
-      .filter((s) => s.state === "done" && s.parsed)
-      .map((s) => ({
-        filename: s.file.name,
-        parsed: s.parsed!,
-        enabled: true,
-      }))
+    const parsedStatements = fileStatuses
+      .filter((s) => s.state === "parsed" && s.parsed)
+      .map((s) => s.parsed!)
 
-    if (reviewable.length > 0) {
-      // Short delay so user sees the final "done" state
-      const timeout = setTimeout(() => {
-        setReviewStatements(reviewable)
-        setPhase("review")
-      }, 800)
-      return () => clearTimeout(timeout)
-    }
+    if (parsedStatements.length === 0) return
+
+    // Auto-confirm immediately
+    confirmingRef.current = true
+    autoConfirm(parsedStatements)
   }, [fileStatuses, phase])
+
+  // ── Auto-confirm parsed statements ──────────────────────────
+  const autoConfirm = async (statements: ParsedStatement[]) => {
+    // Mark all parsed files as confirming
+    setFileStatuses((prev) =>
+      prev.map((s) => s.state === "parsed" ? { ...s, state: "confirming" } : s)
+    )
+
+    try {
+      const res = await fetch("/api/upload/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statements }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        const errMsg = data.error || "Import failed"
+        const details = data.details?.length ? `: ${data.details.join(", ")}` : ""
+        console.error("[confirm] Import error:", data)
+        setFileStatuses((prev) =>
+          prev.map((s) =>
+            s.state === "confirming"
+              ? { ...s, state: "error", error: `${errMsg}${details}` }
+              : s
+          )
+        )
+        confirmingRef.current = false
+        return
+      }
+
+      // Update file statuses with results
+      const results = data.results || []
+      setFileStatuses((prev) => {
+        const confirmingFiles = prev.filter((s) => s.state === "confirming")
+        return prev.map((s) => {
+          if (s.state !== "confirming") return s
+          const idx = confirmingFiles.indexOf(s)
+          const result = results[idx]
+          if (!result || result.accountId === 0) {
+            return {
+              ...s,
+              state: "error" as const,
+              error: result?.error || "Failed to create account",
+            }
+          }
+          return {
+            ...s,
+            state: "done" as const,
+            accountId: result.accountId,
+            transactionsInserted: result.transactionsInserted,
+            isNew: !result.existing,
+          }
+        })
+      })
+
+      await refreshAll()
+
+      // Transition to success after a brief moment
+      setTimeout(() => setPhase("success"), 600)
+    } catch (err) {
+      console.error("[confirm] Network error:", err)
+      setFileStatuses((prev) =>
+        prev.map((s) =>
+          s.state === "confirming"
+            ? { ...s, state: "error", error: "Network error during import" }
+            : s
+        )
+      )
+    } finally {
+      confirmingRef.current = false
+    }
+  }
 
   // ── File selection ────────────────────────────────────────
   const handleFiles = useCallback((fileList: FileList | File[]) => {
@@ -149,11 +203,11 @@ export default function UploadPage() {
       return
     }
 
+    confirmingRef.current = false
     const statuses: FileStatus[] = valid.map((f) => ({ file: f, state: "queued" }))
     setFileStatuses(statuses)
     setPhase("processing")
 
-    // Process files one by one so we get per-file progress
     processFilesSequentially(valid)
   }, [toast])
 
@@ -162,7 +216,6 @@ export default function UploadPage() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
 
-      // Mark this file as uploading
       setFileStatuses((prev) =>
         prev.map((s, j) =>
           j === i ? { ...s, state: "uploading", startedAt: Date.now(), elapsed: 0 } : s
@@ -173,7 +226,6 @@ export default function UploadPage() {
         const formData = new FormData()
         formData.append("files", file)
 
-        // Mark as parsing
         setFileStatuses((prev) =>
           prev.map((s, j) => (j === i ? { ...s, state: "parsing" } : s))
         )
@@ -213,7 +265,8 @@ export default function UploadPage() {
               return { ...s, state: "error", error: match.error }
             }
 
-            return { ...s, state: "done", parsed: match.parsed }
+            // Mark as "parsed" (not "done") — auto-confirm effect will pick this up
+            return { ...s, state: "parsed", parsed: match.parsed }
           })
         )
       } catch {
@@ -231,6 +284,7 @@ export default function UploadPage() {
     const status = fileStatuses[index]
     if (!status) return
 
+    confirmingRef.current = false
     setFileStatuses((prev) =>
       prev.map((s, i) =>
         i === index ? { ...s, state: "uploading", error: undefined, startedAt: Date.now(), elapsed: 0 } : s
@@ -279,7 +333,7 @@ export default function UploadPage() {
               : { ...s, state: "error", error: match.error }
           }
 
-          return { ...s, state: "done", parsed: match.parsed }
+          return { ...s, state: "parsed", parsed: match.parsed }
         })
       )
     } catch {
@@ -288,85 +342,6 @@ export default function UploadPage() {
           i === index ? { ...s, state: "error", error: "Network error" } : s
         )
       )
-    }
-  }
-
-  // ── Inline edit for review ────────────────────────────────
-  const updateReviewField = (
-    index: number,
-    field: keyof ParsedStatement,
-    value: string | number | null
-  ) => {
-    setReviewStatements((prev) =>
-      prev.map((s, i) =>
-        i === index ? { ...s, parsed: { ...s.parsed, [field]: value } } : s
-      )
-    )
-  }
-
-  const toggleStatement = (index: number) => {
-    setReviewStatements((prev) =>
-      prev.map((s, i) => (i === index ? { ...s, enabled: !s.enabled } : s))
-    )
-  }
-
-  // ── Confirm import ────────────────────────────────────────
-  const confirmImport = async () => {
-    const confirmed = reviewStatements
-      .filter((s) => s.enabled)
-      .map((s) => s.parsed)
-
-    if (confirmed.length === 0) {
-      toast("No statements selected for import")
-      return
-    }
-
-    setConfirming(true)
-
-    try {
-      const res = await fetch("/api/upload/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ statements: confirmed }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        const errMsg = data.error || "Import failed"
-        const details = data.details?.length ? `: ${data.details.join(", ")}` : ""
-        toast(`${errMsg}${details}`)
-        console.error("[confirm] Import error:", data)
-        setConfirming(false)
-        return
-      }
-
-      // Log per-statement errors (partial failures)
-      const failed = (data.results || []).filter((r: any) => r.accountId === 0 && r.error)
-      if (failed.length > 0) {
-        const errMsgs = failed.map((f: any) => `${f.institution}: ${f.error}`)
-        console.error("[confirm] Partial failures:", errMsgs)
-        toast(`${failed.length} statement(s) failed to import`)
-      }
-
-      await refreshAll()
-
-      // Build import results summary (only successful ones)
-      const successResults = (data.results || []).filter((r: any) => r.accountId !== 0)
-      const summaryResults: ImportResult[] = successResults.map((r: any, idx: number) => ({
-        institution: r.institution || confirmed[idx]?.institution || "Unknown",
-        accountName: confirmed[idx]?.accountName || "",
-        last4: r.last4 || confirmed[idx]?.last4 || "",
-        transactionsInserted: r.transactionsInserted || 0,
-        isNew: !r.existing,
-      }))
-
-      setImportResults(summaryResults)
-      setPhase("success")
-    } catch {
-      toast("Network error during import")
-    } finally {
-      setConfirming(false)
     }
   }
 
@@ -382,23 +357,10 @@ export default function UploadPage() {
     if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files)
   }
 
-  // ── Helpers ───────────────────────────────────────────────
-  const isLowConfidence = (parsed: ParsedStatement, field: string) => {
-    return parsed.confidence?.[field] !== undefined && parsed.confidence[field] < 0.7
-  }
-
-  const formatPeriod = (start: string | null, end: string | null) => {
-    if (!start || !end) return "Unknown period"
-    const fmt = (d: string) =>
-      new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-    return `${fmt(start)} – ${fmt(end)}`
-  }
-
   const resetAll = () => {
     setPhase("drop")
     setFileStatuses([])
-    setReviewStatements([])
-    setImportResults([])
+    confirmingRef.current = false
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -412,7 +374,6 @@ export default function UploadPage() {
           Import credit card or bank statements to keep your accounts up to date.
         </p>
 
-        {/* Drop zone */}
         <div
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
@@ -458,13 +419,13 @@ export default function UploadPage() {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // PROCESSING PHASE
+  // PROCESSING PHASE (parse + auto-confirm)
   // ═══════════════════════════════════════════════════════════
   if (phase === "processing") {
     const doneCount = fileStatuses.filter((s) => s.state === "done").length
     const errorCount = fileStatuses.filter((s) => s.state === "error").length
+    const parsedCount = fileStatuses.filter((s) => s.state === "parsed" || s.state === "confirming" || s.state === "done").length
     const totalCount = fileStatuses.length
-    const hasPasswordNeeded = fileStatuses.some((s) => s.state === "password-needed")
     const allResolved = fileStatuses.every(
       (s) => s.state === "done" || s.state === "error"
     )
@@ -473,7 +434,9 @@ export default function UploadPage() {
     return (
       <div className="px-4 py-6">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-lg font-bold">Processing Files</h1>
+          <h1 className="text-lg font-bold">
+            {allResolved ? "Import Complete" : "Processing Files"}
+          </h1>
           <button
             onClick={resetAll}
             className="text-muted-foreground hover:text-foreground p-1"
@@ -485,10 +448,9 @@ export default function UploadPage() {
         {/* Overall progress bar */}
         <div className="mb-4">
           <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-            <span>{doneCount} of {totalCount} complete</span>
-            {!allResolved && <span>{Math.round(progressPct)}%</span>}
+            <span>{doneCount} of {totalCount} imported</span>
             {allResolved && doneCount > 0 && (
-              <span className="text-green-400">All done</span>
+              <span className="text-green-500">All done</span>
             )}
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -508,6 +470,8 @@ export default function UploadPage() {
                 ${status.state === "error" ? "border-red-500/30 bg-red-50" : ""}
                 ${status.state === "password-needed" ? "border-amber-500/30 bg-amber-50" : ""}
                 ${status.state === "done" ? "border-green-500/20 bg-green-50" : ""}
+                ${status.state === "parsed" || status.state === "confirming"
+                  ? "border-primary/20 bg-blue-50" : ""}
                 ${status.state === "uploading" || status.state === "parsing"
                   ? "border-primary/30 bg-blue-50" : ""}
                 ${status.state === "queued" ? "border-border/50 opacity-50" : ""}
@@ -524,12 +488,20 @@ export default function UploadPage() {
                         {getStatusMessage(status.elapsed || 0)}
                       </span>
                     )}
+                    {status.state === "parsed" && status.parsed && (
+                      <span className="text-primary/80">
+                        Parsed — saving to account...
+                      </span>
+                    )}
+                    {status.state === "confirming" && (
+                      <span className="text-primary/80">
+                        Creating account &amp; importing transactions...
+                      </span>
+                    )}
                     {status.state === "done" && status.parsed && (
-                      <span className="text-green-400">
-                        {status.parsed.institution}
-                        {status.parsed.last4 && ` ****${status.parsed.last4}`}
-                        {" — "}
-                        {status.parsed.transactions.length} transaction{status.parsed.transactions.length !== 1 ? "s" : ""} found
+                      <span className="text-green-500">
+                        {status.isNew ? "New account created" : "Account updated"}
+                        {status.transactionsInserted ? ` — ${status.transactionsInserted} transaction${status.transactionsInserted !== 1 ? "s" : ""} imported` : ""}
                       </span>
                     )}
                     {status.state === "error" && (
@@ -541,15 +513,13 @@ export default function UploadPage() {
                   </p>
                 </div>
                 <div className="shrink-0 flex items-center gap-2">
-                  {/* Elapsed timer */}
                   {(status.state === "uploading" || status.state === "parsing") && (
                     <span className="text-xs text-muted-foreground font-mono flex items-center gap-1">
                       <Clock className="w-3 h-3" />
                       {status.elapsed || 0}s
                     </span>
                   )}
-                  {/* State icon */}
-                  {(status.state === "uploading" || status.state === "parsing") && (
+                  {(status.state === "uploading" || status.state === "parsing" || status.state === "confirming" || status.state === "parsed") && (
                     <Loader2 className="w-5 h-5 text-primary animate-spin" />
                   )}
                   {status.state === "queued" && (
@@ -605,59 +575,46 @@ export default function UploadPage() {
                 </div>
               )}
 
-              {/* Done: show parsed summary */}
-              {status.state === "done" && status.parsed && (
-                <div className="mt-2 pt-2 border-t border-border grid grid-cols-3 gap-2 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">Balance</span>
-                    <p className="font-medium">
-                      {formatCurrency(status.parsed.balance, status.parsed.currency)}
-                    </p>
+              {/* Parsed/done: show account summary */}
+              {(status.state === "done" || status.state === "parsed" || status.state === "confirming") && status.parsed && (
+                <div className="mt-2 pt-2 border-t border-border/50">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs font-semibold">{status.parsed.institution}</span>
+                    {status.parsed.last4 && (
+                      <span className="text-xs text-muted-foreground">****{status.parsed.last4}</span>
+                    )}
                   </div>
-                  {status.parsed.creditLimit !== null && (
+                  <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
-                      <span className="text-muted-foreground">Limit</span>
+                      <span className="text-muted-foreground">Balance</span>
                       <p className="font-medium">
-                        {formatCurrency(status.parsed.creditLimit, status.parsed.currency)}
+                        {formatCurrency(status.parsed.balance, status.parsed.currency)}
                       </p>
                     </div>
-                  )}
-                  {status.parsed.aprDetected !== null && (
-                    <div>
-                      <span className="text-muted-foreground">APR</span>
-                      <p className="font-medium">{status.parsed.aprDetected}%</p>
-                    </div>
-                  )}
+                    {status.parsed.creditLimit !== null && (
+                      <div>
+                        <span className="text-muted-foreground">Limit</span>
+                        <p className="font-medium">
+                          {formatCurrency(status.parsed.creditLimit, status.parsed.currency)}
+                        </p>
+                      </div>
+                    )}
+                    {status.parsed.transactions.length > 0 && (
+                      <div>
+                        <span className="text-muted-foreground">Transactions</span>
+                        <p className="font-medium">{status.parsed.transactions.length}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
           ))}
         </div>
 
-        {/* Manual continue button when all resolved */}
-        {allResolved && doneCount > 0 && (
-          <button
-            onClick={() => {
-              const reviewable = fileStatuses
-                .filter((s) => s.state === "done" && s.parsed)
-                .map((s) => ({
-                  filename: s.file.name,
-                  parsed: s.parsed!,
-                  enabled: true,
-                }))
-              setReviewStatements(reviewable)
-              setPhase("review")
-            }}
-            className="mt-4 w-full bg-primary text-primary-foreground text-sm font-medium py-3 rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
-          >
-            Review {doneCount} Statement{doneCount > 1 ? "s" : ""}
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        )}
-
         {allResolved && doneCount === 0 && (
           <div className="mt-6 text-center space-y-2">
-            <p className="text-sm text-muted-foreground">No statements could be parsed</p>
+            <p className="text-sm text-muted-foreground">No statements could be imported</p>
             <button onClick={resetAll} className="text-xs text-primary hover:underline">
               Try different files
             </button>
@@ -670,334 +627,55 @@ export default function UploadPage() {
   // ═══════════════════════════════════════════════════════════
   // SUCCESS PHASE
   // ═══════════════════════════════════════════════════════════
-  if (phase === "success") {
-    const totalTx = importResults.reduce((sum, r) => sum + r.transactionsInserted, 0)
-
-    return (
-      <div className="px-4 py-6">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Check className="w-8 h-8 text-green-500" />
-          </div>
-          <h1 className="text-lg font-bold mb-1">Import Complete</h1>
-          <p className="text-sm text-muted-foreground">
-            {importResults.length} account{importResults.length !== 1 ? "s" : ""} updated
-            {totalTx > 0 && ` with ${totalTx} transaction${totalTx !== 1 ? "s" : ""}`}
-          </p>
-        </div>
-
-        <div className="space-y-2 mb-6">
-          {importResults.map((r, i) => (
-            <div key={i} className="bg-white shadow-sm border border-border rounded-xl p-3.5 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center shrink-0">
-                <Check className="w-4 h-4 text-green-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {r.institution} {r.accountName}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {r.last4 && `****${r.last4} · `}
-                  {r.transactionsInserted} transaction{r.transactionsInserted !== 1 ? "s" : ""}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="space-y-3">
-          <Link
-            href="/dashboard"
-            className="w-full bg-primary text-primary-foreground text-sm font-medium py-3 rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
-          >
-            Go to Dashboard
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-          <button
-            onClick={resetAll}
-            className="w-full text-sm text-muted-foreground py-2 hover:text-foreground transition-colors"
-          >
-            Upload more statements
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // REVIEW PHASE
-  // ═══════════════════════════════════════════════════════════
-  const enabledCount = reviewStatements.filter((s) => s.enabled).length
+  const successFiles = fileStatuses.filter((s) => s.state === "done" && s.parsed)
+  const totalTx = successFiles.reduce((sum, s) => sum + (s.transactionsInserted || 0), 0)
 
   return (
-    <div className="px-4 py-6 pb-28">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-lg font-bold">Review Statements</h1>
-          <p className="text-sm text-muted-foreground">
-            {reviewStatements.length} statement{reviewStatements.length > 1 ? "s" : ""} parsed &middot;{" "}
-            {enabledCount} selected
-          </p>
+    <div className="px-4 py-6">
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Check className="w-8 h-8 text-green-500" />
         </div>
+        <h1 className="text-lg font-bold mb-1">Import Complete</h1>
+        <p className="text-sm text-muted-foreground">
+          {successFiles.length} account{successFiles.length !== 1 ? "s" : ""} updated
+          {totalTx > 0 && ` with ${totalTx} transaction${totalTx !== 1 ? "s" : ""}`}
+        </p>
+      </div>
+
+      <div className="space-y-2 mb-6">
+        {successFiles.map((s, i) => (
+          <div key={i} className="bg-white shadow-sm border border-border rounded-xl p-3.5 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center shrink-0">
+              <Check className="w-4 h-4 text-green-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">
+                {s.parsed!.institution} {s.parsed!.accountName}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {s.parsed!.last4 && `****${s.parsed!.last4} · `}
+                {s.transactionsInserted || 0} transaction{(s.transactionsInserted || 0) !== 1 ? "s" : ""}
+                {s.isNew ? " · New account" : " · Updated"}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-3">
+        <Link
+          href="/dashboard"
+          className="w-full bg-primary text-primary-foreground text-sm font-medium py-3 rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+        >
+          Go to Dashboard
+          <ArrowRight className="w-4 h-4" />
+        </Link>
         <button
           onClick={resetAll}
-          className="text-muted-foreground hover:text-foreground p-1"
+          className="w-full text-sm text-muted-foreground py-2 hover:text-foreground transition-colors"
         >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Statement cards */}
-      <div className="space-y-4 overflow-y-auto">
-        {reviewStatements.map((stmt, i) => {
-          const p = stmt.parsed
-          const catLabel =
-            ACCOUNT_CATEGORIES.find((c) => c.value === p.category)?.label || p.category
-
-          return (
-            <div
-              key={i}
-              className={`
-                rounded-xl border p-4 transition-all
-                ${stmt.enabled ? "border-border" : "border-border/30 opacity-50"}
-              `}
-            >
-              {/* Header: institution + toggle */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold truncate">
-                      {p.institution}
-                    </h3>
-                    {isLowConfidence(p, "institution") && (
-                      <span className="text-[0.625rem] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded font-medium shrink-0">
-                        Needs confirmation
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {catLabel}
-                    {p.last4 && ` ending ${p.last4}`}
-                  </p>
-                </div>
-
-                {/* Toggle switch */}
-                <button
-                  onClick={() => toggleStatement(i)}
-                  className={`
-                    relative w-10 h-5 rounded-full shrink-0 ml-3 transition-colors
-                    ${stmt.enabled ? "bg-primary" : "bg-muted"}
-                  `}
-                >
-                  <span
-                    className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
-                    style={stmt.enabled ? { left: "1.375rem" } : { left: "0.125rem" }}
-                  />
-                </button>
-              </div>
-
-              {/* Filename */}
-              <p className="text-[0.6875rem] text-muted-foreground mb-3 flex items-center gap-1">
-                <FileText className="w-3 h-3" />
-                {stmt.filename}
-              </p>
-
-              {/* Fields grid */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
-                {/* Balance */}
-                <div>
-                  <label className="text-muted-foreground block mb-0.5">Balance</label>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={p.balance}
-                      onChange={(e) =>
-                        updateReviewField(i, "balance", parseFloat(e.target.value) || 0)
-                      }
-                      disabled={!stmt.enabled}
-                      className={`
-                        w-full bg-transparent border-b font-medium py-0.5
-                        focus:outline-none focus:border-primary transition-colors
-                        ${isLowConfidence(p, "balance") ? "border-amber-500" : "border-border/50"}
-                      `}
-                    />
-                    {isLowConfidence(p, "balance") && (
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    )}
-                  </div>
-                </div>
-
-                {/* Statement period */}
-                <div>
-                  <label className="text-muted-foreground block mb-0.5">Period</label>
-                  <p className="font-medium py-0.5">
-                    {formatPeriod(p.statementPeriodStart, p.statementPeriodEnd)}
-                  </p>
-                </div>
-
-                {/* Transactions */}
-                <div>
-                  <label className="text-muted-foreground block mb-0.5">Transactions</label>
-                  <p className="font-medium py-0.5">{p.transactions.length} found</p>
-                </div>
-
-                {/* Account type */}
-                <div>
-                  <label className="text-muted-foreground block mb-0.5">Account Type</label>
-                  <select
-                    value={p.category}
-                    onChange={(e) =>
-                      updateReviewField(i, "category", e.target.value as AccountCategory)
-                    }
-                    disabled={!stmt.enabled}
-                    className={`
-                      bg-transparent border-b py-0.5 font-medium w-full
-                      focus:outline-none focus:border-primary transition-colors
-                      ${isLowConfidence(p, "category") ? "border-amber-500" : "border-border/50"}
-                    `}
-                  >
-                    {ACCOUNT_CATEGORIES.map((c) => (
-                      <option key={c.value} value={c.value} className="bg-background text-foreground">
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Credit limit */}
-                {p.creditLimit !== null && (
-                  <div>
-                    <label className="text-muted-foreground block mb-0.5">Credit Limit</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={p.creditLimit ?? ""}
-                      onChange={(e) =>
-                        updateReviewField(i, "creditLimit", e.target.value ? parseFloat(e.target.value) : null)
-                      }
-                      disabled={!stmt.enabled}
-                      className="w-full bg-transparent border-b font-medium py-0.5 focus:outline-none focus:border-primary border-border/50"
-                    />
-                  </div>
-                )}
-
-                {/* Minimum payment */}
-                {p.minimumPayment !== null && (
-                  <div>
-                    <label className="text-muted-foreground block mb-0.5">Min Payment</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={p.minimumPayment ?? ""}
-                      onChange={(e) =>
-                        updateReviewField(i, "minimumPayment", e.target.value ? parseFloat(e.target.value) : null)
-                      }
-                      disabled={!stmt.enabled}
-                      className="w-full bg-transparent border-b font-medium py-0.5 focus:outline-none focus:border-primary border-border/50"
-                    />
-                  </div>
-                )}
-
-                {/* Interest charged */}
-                {p.interestCharged !== null && (
-                  <div>
-                    <label className="text-muted-foreground block mb-0.5">Interest Charged</label>
-                    <p className="font-medium py-0.5">
-                      {formatCurrency(p.interestCharged ?? 0, baseCurrency)}
-                    </p>
-                  </div>
-                )}
-
-                {/* APR */}
-                {p.aprDetected !== null && (
-                  <div>
-                    <label className="text-muted-foreground block mb-0.5">APR Detected</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={p.aprDetected ?? ""}
-                      onChange={(e) =>
-                        updateReviewField(i, "aprDetected", e.target.value ? parseFloat(e.target.value) : null)
-                      }
-                      disabled={!stmt.enabled}
-                      className={`
-                        w-full bg-transparent border-b font-medium py-0.5
-                        focus:outline-none focus:border-primary transition-colors
-                        ${isLowConfidence(p, "aprDetected") ? "border-amber-500" : "border-border/50"}
-                      `}
-                    />
-                    {isLowConfidence(p, "aprDetected") && (
-                      <span className="text-[0.625rem] text-amber-400">Needs confirmation</span>
-                    )}
-                  </div>
-                )}
-
-                {/* Payment due date */}
-                {p.paymentDueDate && (
-                  <div>
-                    <label className="text-muted-foreground block mb-0.5">Payment Due</label>
-                    <p className="font-medium py-0.5">
-                      {new Date(p.paymentDueDate).toLocaleDateString("en-GB", {
-                        day: "numeric", month: "short", year: "numeric",
-                      })}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Institution name edit */}
-              <div className="mt-3 pt-3 border-t border-border/30">
-                <label className="text-xs text-muted-foreground block mb-1">Institution Name</label>
-                <input
-                  type="text"
-                  value={p.institution}
-                  onChange={(e) => updateReviewField(i, "institution", e.target.value)}
-                  disabled={!stmt.enabled}
-                  className="w-full text-sm bg-transparent border-b border-border/50 py-0.5 font-medium focus:outline-none focus:border-primary transition-colors"
-                />
-              </div>
-
-              {/* Account name edit */}
-              <div className="mt-2">
-                <label className="text-xs text-muted-foreground block mb-1">Account Name</label>
-                <input
-                  type="text"
-                  value={p.accountName}
-                  onChange={(e) => updateReviewField(i, "accountName", e.target.value)}
-                  disabled={!stmt.enabled}
-                  className="w-full text-sm bg-transparent border-b border-border/50 py-0.5 font-medium focus:outline-none focus:border-primary transition-colors"
-                />
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Sticky bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur border-t border-border">
-        <button
-          onClick={confirmImport}
-          disabled={confirming || enabledCount === 0}
-          className={`
-            w-full text-sm font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2
-            ${enabledCount === 0
-              ? "bg-muted text-muted-foreground cursor-not-allowed"
-              : "bg-primary text-primary-foreground hover:bg-primary/90"
-            }
-          `}
-        >
-          {confirming ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Importing...
-            </>
-          ) : (
-            <>
-              <Check className="w-4 h-4" />
-              Import {enabledCount} Statement{enabledCount !== 1 ? "s" : ""}
-            </>
-          )}
+          Upload more statements
         </button>
       </div>
     </div>
