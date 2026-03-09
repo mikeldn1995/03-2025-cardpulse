@@ -13,25 +13,31 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #0A1628, #1B2A4A)",
+          background: "#1B2A4A",
           borderRadius: 7,
         }}
       >
         <svg
           width="22"
           height="22"
-          viewBox="0 0 512 512"
+          viewBox="0 0 48 48"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <rect x="56" y="116" width="400" height="280" rx="32" fill="white" opacity="0.95" />
-          <polyline
-            points="56,296 156,296 196,216 256,356 316,236 356,296 456,296"
+          <path
+            d="M28 14a12 12 0 1 0 0 20"
+            stroke="white"
+            strokeWidth="3"
+            strokeLinecap="round"
             fill="none"
+          />
+          <path
+            d="M10 24h8l3-6 4 12 3-6h10"
             stroke="#3b82f6"
-            strokeWidth="28"
+            strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
+            fill="none"
           />
         </svg>
       </div>

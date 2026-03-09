@@ -74,11 +74,11 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#0A1628]">
+    <div className="min-h-dvh bg-[#FCFCFC]">
       <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
         <div className="pb-1">
-          <h1 className="text-lg font-semibold text-white">Settings</h1>
-          <p className="text-sm text-slate-400">Preferences and account</p>
+          <h1 className="text-lg font-semibold text-[#1B2A4A]">Settings</h1>
+          <p className="text-sm text-muted-foreground">Preferences and account</p>
         </div>
 
         {/* Profile */}
@@ -101,9 +101,9 @@ export default function SettingsPage() {
                     value={nameInput}
                     onChange={(e) => setNameInput(e.target.value)}
                     autoFocus
-                    className="h-8 flex-1 px-2.5 text-sm bg-[#0A1628] border border-slate-600 rounded-md text-white outline-none focus:border-blue-500"
+                    className="h-8 flex-1 px-2.5 text-sm bg-gray-50 border border-border rounded-md text-[#1B2A4A] outline-none focus:border-blue-500"
                   />
-                  <button type="submit" className="text-xs font-medium text-blue-400 hover:text-blue-300">
+                  <button type="submit" className="text-xs font-medium text-blue-400 hover:text-blue-500">
                     Save
                   </button>
                   <button
@@ -112,14 +112,14 @@ export default function SettingsPage() {
                       setEditingName(false)
                       setNameInput(userName)
                     }}
-                    className="text-xs text-slate-500 hover:text-slate-400"
+                    className="text-xs text-muted-foreground hover:text-foreground"
                   >
                     Cancel
                   </button>
                 </form>
               ) : (
                 <div
-                  className="text-sm font-medium text-white cursor-pointer hover:text-blue-300 transition-colors"
+                  className="text-sm font-medium text-[#1B2A4A] cursor-pointer hover:text-blue-500 transition-colors"
                   onClick={() => {
                     setNameInput(userName)
                     setEditingName(true)
@@ -128,7 +128,7 @@ export default function SettingsPage() {
                   {userName || "Set your name"}
                 </div>
               )}
-              <div className="text-xs text-slate-500 mt-0.5">{userEmail || "demo@cardpulse.io"}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{userEmail || "demo@cardpulse.io"}</div>
             </div>
           </div>
         </Section>
@@ -136,7 +136,7 @@ export default function SettingsPage() {
         {/* Preferences */}
         <Section title="Preferences">
           <div>
-            <label className="block text-xs text-slate-400 mb-2">Base Currency</label>
+            <label className="block text-xs text-muted-foreground mb-2">Base Currency</label>
             <div className="grid grid-cols-5 gap-1.5">
               {CURRENCIES.map((c) => (
                 <button
@@ -148,7 +148,7 @@ export default function SettingsPage() {
                   className={`py-2 text-xs font-medium rounded-md transition-colors ${
                     baseCurrency === c.code
                       ? "bg-blue-500 text-white"
-                      : "bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700"
+                      : "bg-gray-100 text-muted-foreground hover:text-foreground hover:bg-gray-200"
                   }`}
                 >
                   {c.label}
@@ -163,23 +163,23 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <button
               disabled
-              className="w-full flex items-center gap-3 py-3 px-3 text-sm text-slate-400 bg-slate-800/50 rounded-md opacity-60 cursor-not-allowed"
+              className="w-full flex items-center gap-3 py-3 px-3 text-sm text-muted-foreground bg-gray-50 rounded-md opacity-60 cursor-not-allowed"
             >
               <Download className="w-4 h-4" />
               <div className="flex-1 text-left">
                 <div className="font-medium">Export Data</div>
-                <div className="text-[0.6875rem] text-slate-500">CSV/JSON export — coming soon</div>
+                <div className="text-[0.6875rem] text-muted-foreground">CSV/JSON export — coming soon</div>
               </div>
             </button>
 
             <button
               disabled
-              className="w-full flex items-center gap-3 py-3 px-3 text-sm text-slate-400 bg-slate-800/50 rounded-md opacity-60 cursor-not-allowed"
+              className="w-full flex items-center gap-3 py-3 px-3 text-sm text-muted-foreground bg-gray-50 rounded-md opacity-60 cursor-not-allowed"
             >
               <FileText className="w-4 h-4" />
               <div className="flex-1 text-left">
                 <div className="font-medium">Generate Monthly Digest</div>
-                <div className="text-[0.6875rem] text-slate-500">AI summary — coming soon</div>
+                <div className="text-[0.6875rem] text-muted-foreground">AI summary — coming soon</div>
               </div>
             </button>
 
@@ -192,7 +192,7 @@ export default function SettingsPage() {
                     ? "bg-red-600 text-white"
                     : confirmDelete
                       ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                      : "bg-slate-800/80 text-red-400 hover:bg-red-500/10"
+                      : "bg-gray-100 text-red-400 hover:bg-red-500/10"
                 }`}
               >
                 <Trash2 className="w-4 h-4" />
@@ -210,7 +210,7 @@ export default function SettingsPage() {
                     setConfirmDelete(false)
                     setConfirmDeleteFinal(false)
                   }}
-                  className="w-full text-xs text-slate-500 underline mt-1.5 py-1"
+                  className="w-full text-xs text-muted-foreground underline mt-1.5 py-1"
                 >
                   Cancel
                 </button>
@@ -223,15 +223,15 @@ export default function SettingsPage() {
         <Section title="App Info">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Logo size={28} variant="dark" />
+              <Logo size={28} />
               <div>
-                <div className="text-sm font-medium text-white">CardPulse</div>
-                <div className="text-xs text-slate-500">v4.0.0 &quot;Aggregate&quot;</div>
+                <div className="text-sm font-medium text-[#1B2A4A]">CardPulse</div>
+                <div className="text-xs text-muted-foreground">v4.0.0 &quot;Aggregate&quot;</div>
               </div>
             </div>
             <Link
               href="/about"
-              className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-500 transition-colors"
             >
               <Info className="w-3.5 h-3.5" />
               About
@@ -246,7 +246,7 @@ export default function SettingsPage() {
           className={`w-full flex items-center justify-center gap-2 py-3 text-sm font-medium rounded-lg transition-colors ${
             confirmLogout
               ? "bg-red-600 text-white"
-              : "bg-[#111D32] border border-slate-700/50 text-red-400 hover:bg-red-500/10"
+              : "bg-gray-50 border border-border text-red-400 hover:bg-red-500/10"
           }`}
         >
           <LogOut className="w-4 h-4" />
@@ -255,14 +255,14 @@ export default function SettingsPage() {
         {confirmLogout && (
           <button
             onClick={() => setConfirmLogout(false)}
-            className="w-full text-xs text-slate-500 underline text-center"
+            className="w-full text-xs text-muted-foreground underline text-center"
           >
             Cancel
           </button>
         )}
 
         {/* Footer */}
-        <div className="text-center text-[0.625rem] text-slate-600 pt-2 pb-20">
+        <div className="text-center text-[0.625rem] text-gray-300 pt-2 pb-20">
           CardPulse v4.0.0
         </div>
       </div>
@@ -272,8 +272,8 @@ export default function SettingsPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-[#111D32] border border-slate-700/50 rounded-xl p-4">
-      <div className="text-[0.6875rem] uppercase tracking-wider text-slate-500 font-medium mb-3">
+    <div className="bg-white shadow-sm border border-border rounded-xl p-4">
+      <div className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium mb-3">
         {title}
       </div>
       {children}

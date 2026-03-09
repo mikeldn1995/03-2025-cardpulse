@@ -109,20 +109,14 @@ export default function DashboardPage() {
   if (accounts.length === 0) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <div
-          className="w-full rounded-2xl p-8 text-center"
-          style={{ backgroundColor: "#1B2A4A" }}
-        >
-          <div
-            className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-          >
-            <Upload className="h-7 w-7 text-slate-300" />
+        <div className="w-full rounded-2xl p-8 text-center bg-white shadow-sm border border-border">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+            <Upload className="h-7 w-7 text-muted-foreground" />
           </div>
-          <h2 className="mb-2 text-lg font-semibold text-white">
+          <h2 className="mb-2 text-lg font-semibold text-[#1B2A4A]">
             Get started with CardPulse
           </h2>
-          <p className="mb-6 text-sm text-slate-400">
+          <p className="mb-6 text-sm text-muted-foreground">
             Upload your first statement to get started
           </p>
           <Link
@@ -141,7 +135,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5 pb-8">
       {/* Greeting */}
-      <p className="text-sm text-slate-400">{getGreeting(firstName)}</p>
+      <p className="text-sm text-muted-foreground">{getGreeting(firstName)}</p>
 
       {/* Alerts Banner */}
       {alerts.length > 0 && (
@@ -150,13 +144,13 @@ export default function DashboardPage() {
             <div
               key={alert.id}
               className="flex items-start gap-2.5 rounded-xl px-4 py-3"
-              style={{ backgroundColor: "rgba(245, 158, 11, 0.15)" }}
+              style={{ backgroundColor: "rgba(245, 158, 11, 0.1)" }}
             >
               <AlertTriangle
                 className="mt-0.5 h-4 w-4 shrink-0"
                 style={{ color: "#F59E0B" }}
               />
-              <span className="text-[0.8125rem] leading-snug text-amber-200">
+              <span className="text-[0.8125rem] leading-snug text-amber-700">
                 {alert.label}
               </span>
             </div>
@@ -167,32 +161,29 @@ export default function DashboardPage() {
       {/* Net Worth Header */}
       <div className="text-center pt-2">
         <p
-          className="text-4xl font-bold tracking-tight tabular-nums text-white"
+          className="text-4xl font-bold tracking-tight tabular-nums text-[#1B2A4A]"
         >
           {formatCurrency(Math.abs(displayAmount), accounts[0]?.currency ?? "GBP")}
         </p>
         {displayAmount < 0 && (
           <div className="mt-1 flex items-center justify-center gap-1">
-            <ArrowDownRight className="h-3.5 w-3.5 text-red-400" />
-            <span className="text-xs text-red-400">In debt</span>
+            <ArrowDownRight className="h-3.5 w-3.5 text-red-500" />
+            <span className="text-xs text-red-500">In debt</span>
           </div>
         )}
-        <p className="mt-1 text-xs text-slate-400 uppercase tracking-wider">
+        <p className="mt-1 text-xs text-muted-foreground uppercase tracking-wider">
           {displayLabel}
         </p>
 
         {/* Pill Toggle */}
-        <div
-          className="mx-auto mt-4 inline-flex rounded-full p-1"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-        >
+        <div className="mx-auto mt-4 inline-flex rounded-full p-1 bg-gray-100">
           <button
             onClick={() => setViewMode("net-worth")}
             className="rounded-full px-4 py-1.5 text-xs font-medium transition-all"
             style={{
               backgroundColor:
                 viewMode === "net-worth" ? "#1B2A4A" : "transparent",
-              color: viewMode === "net-worth" ? "#fff" : "#94A3B8",
+              color: viewMode === "net-worth" ? "#fff" : "#64748B",
             }}
           >
             Net Worth
@@ -203,7 +194,7 @@ export default function DashboardPage() {
             style={{
               backgroundColor:
                 viewMode === "debts" ? "#1B2A4A" : "transparent",
-              color: viewMode === "debts" ? "#fff" : "#94A3B8",
+              color: viewMode === "debts" ? "#fff" : "#64748B",
             }}
           >
             Debts &amp; Overdrafts
@@ -221,10 +212,10 @@ export default function DashboardPage() {
             <div key={cat}>
               {/* Group Header */}
               <div className="mb-2.5 flex items-center justify-between px-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {categoryLabel(cat as Account["category"])}
                 </span>
-                <span className="text-xs font-semibold tabular-nums text-slate-300">
+                <span className="text-xs font-semibold tabular-nums text-foreground">
                   {formatCurrency(groupTotal, accts[0]?.currency ?? "GBP")}
                 </span>
               </div>
@@ -272,8 +263,7 @@ function AccountTile({ account }: { account: Account }) {
   return (
     <Link
       href={`/accounts/${account.id}`}
-      className="flex items-center gap-3.5 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98]"
-      style={{ backgroundColor: "#1B2A4A" }}
+      className="flex items-center gap-3.5 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98] bg-white shadow-sm border border-border"
     >
       {/* Logo / Initials */}
       <div
@@ -295,11 +285,11 @@ function AccountTile({ account }: { account: Account }) {
       {/* Name + Last4 */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-semibold text-white">
+          <span className="truncate text-sm font-semibold text-[#1B2A4A]">
             {account.accountName || account.institution}
           </span>
           {account.last4 && (
-            <span className="shrink-0 text-xs text-slate-500 font-mono">
+            <span className="shrink-0 text-xs text-muted-foreground font-mono">
               ••{account.last4}
             </span>
           )}
@@ -308,10 +298,7 @@ function AccountTile({ account }: { account: Account }) {
         {/* Utilisation bar for credit cards */}
         {utilisation !== null && (
           <div className="mt-1.5 flex items-center gap-2">
-            <div
-              className="h-1.5 flex-1 rounded-full overflow-hidden"
-              style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-            >
+            <div className="h-1.5 flex-1 rounded-full overflow-hidden bg-gray-100">
               <div
                 className="h-full rounded-full transition-all"
                 style={{
@@ -320,7 +307,7 @@ function AccountTile({ account }: { account: Account }) {
                 }}
               />
             </div>
-            <span className="shrink-0 text-[0.625rem] tabular-nums text-slate-400">
+            <span className="shrink-0 text-[0.625rem] tabular-nums text-muted-foreground">
               {Math.round(utilisation)}%
             </span>
           </div>
@@ -329,12 +316,12 @@ function AccountTile({ account }: { account: Account }) {
 
       {/* Balance */}
       <div className="shrink-0 text-right">
-        <span className="text-sm font-semibold tabular-nums text-white">
+        <span className="text-sm font-semibold tabular-nums text-[#1B2A4A]">
           {formatCurrency(account.balance, account.currency)}
         </span>
       </div>
 
-      <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
     </Link>
   )
 }

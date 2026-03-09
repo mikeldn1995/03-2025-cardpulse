@@ -98,20 +98,20 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#0A1628] flex flex-col">
+    <div className="min-h-dvh bg-[#FCFCFC] flex flex-col">
       {/* Header */}
-      <header className="px-4 h-14 flex items-center gap-2.5 border-b border-slate-800">
+      <header className="px-4 h-14 flex items-center gap-2.5 border-b border-border">
         <button
           onClick={() => {
             if (step === "account") router.push("/")
             else if (step === "otp") setStep("account")
             else setStep("otp")
           }}
-          className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-white rounded-md transition-colors"
+          className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-md transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <span className="text-sm font-semibold tracking-tight text-white">
+        <span className="text-sm font-semibold tracking-tight text-[#1B2A4A]">
           Create Account
         </span>
       </header>
@@ -123,13 +123,13 @@ export default function RegisterPage() {
             <div key={s.key} className="flex-1 flex items-center gap-1">
               <div
                 className={`h-1 flex-1 rounded-full transition-colors ${
-                  i <= stepIndex ? "bg-blue-500" : "bg-slate-700"
+                  i <= stepIndex ? "bg-blue-500" : "bg-gray-200"
                 }`}
               />
             </div>
           ))}
         </div>
-        <div className="text-[0.6875rem] text-slate-500 mt-1.5">
+        <div className="text-[0.6875rem] text-muted-foreground mt-1.5">
           Step {stepIndex + 1} of {STEPS.length} -- {STEPS[stepIndex].label}
         </div>
       </div>
@@ -139,18 +139,18 @@ export default function RegisterPage() {
         {step === "account" && (
           <div className="space-y-5">
             <div className="flex justify-center mb-2">
-              <Logo size={40} variant="dark" />
+              <Logo size={40} />
             </div>
             <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white mb-1">
+              <h2 className="text-xl font-semibold tracking-tight text-[#1B2A4A] mb-1">
                 Let&apos;s get started
               </h2>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-muted-foreground">
                 We&apos;ll send a verification code to your email.
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              <label className="block text-sm font-medium text-foreground mb-1.5">
                 Full Name
               </label>
               <input
@@ -159,11 +159,11 @@ export default function RegisterPage() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="John Smith"
                 autoFocus
-                className="w-full h-11 px-3 text-sm bg-[#111D32] border border-slate-700 rounded-lg text-white placeholder:text-slate-600 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                className="w-full h-11 px-3 text-sm bg-white border border-border rounded-lg text-[#1B2A4A] placeholder:text-muted-foreground outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              <label className="block text-sm font-medium text-foreground mb-1.5">
                 Email
               </label>
               <input
@@ -171,7 +171,7 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@email.com"
-                className="w-full h-11 px-3 text-sm bg-[#111D32] border border-slate-700 rounded-lg text-white placeholder:text-slate-600 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                className="w-full h-11 px-3 text-sm bg-white border border-border rounded-lg text-[#1B2A4A] placeholder:text-muted-foreground outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
             {error && <p className="text-xs text-red-400">{error}</p>}
@@ -183,11 +183,11 @@ export default function RegisterPage() {
               {loading ? "Sending code..." : "Continue"}
               {!loading && <ArrowRight className="w-4 h-4" />}
             </button>
-            <p className="text-center text-[0.8125rem] text-slate-500">
+            <p className="text-center text-[0.8125rem] text-muted-foreground">
               Already have an account?{" "}
               <button
                 onClick={() => router.push("/login")}
-                className="font-medium text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
+                className="font-medium text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
               >
                 Sign in
               </button>
@@ -198,15 +198,15 @@ export default function RegisterPage() {
         {step === "otp" && (
           <div className="space-y-5">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white mb-1">
+              <h2 className="text-xl font-semibold tracking-tight text-[#1B2A4A] mb-1">
                 Verify your email
               </h2>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-muted-foreground">
                 Enter the 6-digit code sent to {email}
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              <label className="block text-sm font-medium text-foreground mb-1.5">
                 Verification code
               </label>
               <input
@@ -218,7 +218,7 @@ export default function RegisterPage() {
                 autoFocus
                 autoComplete="one-time-code"
                 placeholder="000000"
-                className="w-full h-14 px-3 text-center text-lg tracking-[0.3em] font-mono bg-[#111D32] border border-slate-700 rounded-lg text-white placeholder:text-slate-600 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                className="w-full h-14 px-3 text-center text-lg tracking-[0.3em] font-mono bg-white border border-border rounded-lg text-[#1B2A4A] placeholder:text-muted-foreground outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
             {error && <p className="text-xs text-red-400">{error}</p>}
@@ -233,7 +233,7 @@ export default function RegisterPage() {
             <button
               onClick={handleAccountNext}
               disabled={loading}
-              className="w-full text-center text-xs text-slate-500 hover:text-slate-300 disabled:opacity-50 transition-colors"
+              className="w-full text-center text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
             >
               Resend code
             </button>
@@ -246,10 +246,10 @@ export default function RegisterPage() {
               <Check className="w-8 h-8 text-emerald-400" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white mb-1">
+              <h2 className="text-xl font-semibold tracking-tight text-[#1B2A4A] mb-1">
                 You&apos;re all set, {name.trim().split(" ")[0]}!
               </h2>
-              <p className="text-sm text-slate-400 max-w-[260px] mx-auto">
+              <p className="text-sm text-muted-foreground max-w-[260px] mx-auto">
                 Your account is ready. Let&apos;s upload your first statements.
               </p>
             </div>

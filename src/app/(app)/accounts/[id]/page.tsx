@@ -55,26 +55,23 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div
-      className="rounded-2xl overflow-hidden"
-      style={{ backgroundColor: "#1B2A4A" }}
-    >
+    <div className="rounded-2xl overflow-hidden bg-white shadow-sm border border-border">
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between px-4 py-3.5"
       >
         <div className="flex items-center gap-2">
-          {Icon && <Icon className="h-4 w-4 text-slate-400" />}
-          <span className="text-sm font-semibold text-white">{title}</span>
+          {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
+          <span className="text-sm font-semibold text-[#1B2A4A]">{title}</span>
         </div>
         {open ? (
-          <ChevronUp className="h-4 w-4 text-slate-400" />
+          <ChevronUp className="h-4 w-4 text-muted-foreground" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-slate-400" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         )}
       </button>
       {open && (
-        <div className="px-4 pb-4 border-t border-white/5">{children}</div>
+        <div className="px-4 pb-4 border-t border-border">{children}</div>
       )}
     </div>
   )
@@ -110,15 +107,15 @@ function EditableField({
   }
 
   return (
-    <div className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-      <span className="text-xs text-slate-400">{label}</span>
+    <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
+      <span className="text-xs text-muted-foreground">{label}</span>
       {editing ? (
         <div className="flex items-center gap-1.5">
           {type === "select" && options ? (
             <select
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              className="h-7 px-2 text-sm text-white bg-white/10 border border-white/20 rounded-lg outline-none"
+              className="h-7 px-2 text-sm text-foreground bg-gray-50 border border-border rounded-lg outline-none"
             >
               {options.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -137,21 +134,21 @@ function EditableField({
                 if (e.key === "Enter") handleSave()
                 if (e.key === "Escape") setEditing(false)
               }}
-              className="h-7 w-28 px-2 text-sm text-white bg-white/10 border border-white/20 rounded-lg outline-none text-right"
+              className="h-7 w-28 px-2 text-sm text-foreground bg-gray-50 border border-border rounded-lg outline-none text-right"
             />
           )}
           {suffix && (
-            <span className="text-xs text-slate-400">{suffix}</span>
+            <span className="text-xs text-muted-foreground">{suffix}</span>
           )}
           <button
             onClick={handleSave}
-            className="h-7 w-7 flex items-center justify-center text-green-400 hover:bg-white/5 rounded-lg"
+            className="h-7 w-7 flex items-center justify-center text-green-500 hover:bg-gray-50 rounded-lg"
           >
             <Check className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => setEditing(false)}
-            className="h-7 w-7 flex items-center justify-center text-slate-400 hover:bg-white/5 rounded-lg"
+            className="h-7 w-7 flex items-center justify-center text-muted-foreground hover:bg-gray-50 rounded-lg"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -164,13 +161,13 @@ function EditableField({
           }}
           className="flex items-center gap-1.5 group"
         >
-          <span className="text-sm text-white tabular-nums">
+          <span className="text-sm text-[#1B2A4A] tabular-nums">
             {displayValue ?? String(value ?? "--")}
             {suffix && (
-              <span className="text-slate-400 ml-0.5">{suffix}</span>
+              <span className="text-muted-foreground ml-0.5">{suffix}</span>
             )}
           </span>
-          <Pencil className="h-3 w-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
       )}
     </div>
@@ -190,12 +187,9 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null
   return (
-    <div
-      className="rounded-lg px-3 py-2 text-xs shadow-lg border border-white/10"
-      style={{ backgroundColor: "#0F1A2E" }}
-    >
-      <p className="text-slate-400">{label}</p>
-      <p className="text-white font-semibold tabular-nums">
+    <div className="rounded-lg px-3 py-2 text-xs shadow-lg border border-border bg-white">
+      <p className="text-muted-foreground">{label}</p>
+      <p className="text-[#1B2A4A] font-semibold tabular-nums">
         {formatCurrency(payload[0].value)}
       </p>
     </div>
@@ -351,7 +345,7 @@ export default function AccountDetailPage() {
   if (loading || !account) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-sm text-slate-400">Loading...</div>
+        <div className="text-sm text-muted-foreground">Loading...</div>
       </div>
     )
   }
@@ -376,7 +370,7 @@ export default function AccountDetailPage() {
       {/* Back Button */}
       <button
         onClick={() => router.push("/accounts")}
-        className="flex items-center gap-1 text-sm text-slate-400 hover:text-white transition-colors -ml-1"
+        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors -ml-1"
       >
         <ChevronLeft className="h-4 w-4" />
         Accounts
@@ -396,17 +390,14 @@ export default function AccountDetailPage() {
         </div>
 
         {/* Balance */}
-        <p className="text-4xl font-bold tracking-tight tabular-nums text-white">
+        <p className="text-4xl font-bold tracking-tight tabular-nums text-[#1B2A4A]">
           {formatCurrency(account.balance, account.currency)}
         </p>
 
         {/* Credit utilisation */}
         {account.creditLimit && (
           <div className="mt-2 flex items-center justify-center gap-2">
-            <div
-              className="h-1.5 w-32 rounded-full overflow-hidden"
-              style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-            >
+            <div className="h-1.5 w-32 rounded-full overflow-hidden bg-gray-100">
               <div
                 className="h-full rounded-full transition-all"
                 style={{
@@ -420,7 +411,7 @@ export default function AccountDetailPage() {
                 }}
               />
             </div>
-            <span className="text-xs tabular-nums text-slate-400">
+            <span className="text-xs tabular-nums text-muted-foreground">
               {Math.round(
                 (Math.abs(account.balance) / account.creditLimit) * 100
               )}
@@ -430,10 +421,10 @@ export default function AccountDetailPage() {
         )}
 
         {/* Account name + Institution */}
-        <p className="mt-3 text-sm font-medium text-white">
+        <p className="mt-3 text-sm font-medium text-[#1B2A4A]">
           {account.accountName || account.institution}
         </p>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-muted-foreground">
           {account.institution}
           {account.last4 && (
             <span className="font-mono ml-1.5">••{account.last4}</span>
@@ -444,10 +435,10 @@ export default function AccountDetailPage() {
         {stale && (
           <div
             className="mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1"
-            style={{ backgroundColor: "rgba(245, 158, 11, 0.15)" }}
+            style={{ backgroundColor: "rgba(245, 158, 11, 0.1)" }}
           >
             <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-            <span className="text-xs text-amber-300">
+            <span className="text-xs text-amber-600">
               Balance may be outdated
             </span>
           </div>
@@ -489,7 +480,7 @@ export default function AccountDetailPage() {
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <p className="text-[0.6875rem] text-slate-500 mt-2">
+        <p className="text-[0.6875rem] text-muted-foreground mt-2">
           Balance history will show more data as snapshots accumulate.
         </p>
       </Section>
@@ -497,38 +488,32 @@ export default function AccountDetailPage() {
       {/* ── Recent Transactions ──────────────────────────── */}
       <Section title="Recent Transactions" icon={Wallet} defaultOpen={true}>
         {transactions.length === 0 ? (
-          <p className="text-sm text-slate-400 py-4 text-center">
+          <p className="text-sm text-muted-foreground py-4 text-center">
             No transactions yet
           </p>
         ) : (
-          <div className="divide-y divide-white/5 pt-2">
+          <div className="divide-y divide-border pt-2">
             {transactions.map((tx) => (
               <div
                 key={tx.id}
                 className="flex items-center justify-between py-2.5"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-white truncate">
+                  <p className="text-sm text-[#1B2A4A] truncate">
                     {tx.description}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-muted-foreground">
                       {formatDate(tx.date)}
                     </span>
-                    <span
-                      className="text-[0.625rem] px-1.5 py-0.5 rounded-full font-medium"
-                      style={{
-                        backgroundColor: "rgba(255,255,255,0.06)",
-                        color: "#94A3B8",
-                      }}
-                    >
+                    <span className="text-[0.625rem] px-1.5 py-0.5 rounded-full font-medium bg-gray-100 text-muted-foreground">
                       {tx.category}
                     </span>
                   </div>
                 </div>
                 <span
                   className={`text-sm font-semibold tabular-nums shrink-0 ml-3 ${
-                    tx.amount >= 0 ? "text-green-400" : "text-white"
+                    tx.amount >= 0 ? "text-green-500" : "text-[#1B2A4A]"
                   }`}
                 >
                   {tx.amount >= 0 ? "+" : ""}
@@ -541,7 +526,7 @@ export default function AccountDetailPage() {
         {transactions.length >= 20 && (
           <Link
             href={`/transactions?accountId=${account.id}`}
-            className="block text-center text-xs text-blue-400 hover:text-blue-300 pt-3 font-medium"
+            className="block text-center text-xs text-blue-500 hover:text-blue-600 pt-3 font-medium"
           >
             View all transactions
           </Link>
@@ -711,15 +696,15 @@ export default function AccountDetailPage() {
           />
 
           {/* Direct Debit */}
-          <div className="py-3 border-b border-white/5">
-            <span className="text-xs text-slate-400 block mb-2">
+          <div className="py-3 border-b border-border">
+            <span className="text-xs text-muted-foreground block mb-2">
               Direct Debit
             </span>
             <div className="space-y-1.5">
               {(["minimum", "custom", "full", "none"] as const).map((opt) => (
                 <label
                   key={opt}
-                  className="flex items-center gap-2 text-sm text-white cursor-pointer"
+                  className="flex items-center gap-2 text-sm text-[#1B2A4A] cursor-pointer"
                 >
                   <input
                     type="radio"
@@ -742,7 +727,7 @@ export default function AccountDetailPage() {
                               ddAmount: parseFloat(e.target.value) || 0,
                             })
                           }
-                          className="w-20 h-7 px-2 text-sm text-white bg-white/10 border border-white/20 rounded-lg outline-none"
+                          className="w-20 h-7 px-2 text-sm text-foreground bg-gray-50 border border-border rounded-lg outline-none"
                           onClick={(e) => e.stopPropagation()}
                         />
                       )}
@@ -758,25 +743,22 @@ export default function AccountDetailPage() {
       </Section>
 
       {/* ── Actions ──────────────────────────────────────── */}
-      <div
-        className="rounded-2xl p-4 space-y-3"
-        style={{ backgroundColor: "#1B2A4A" }}
-      >
-        <h3 className="text-sm font-semibold text-white mb-1">Actions</h3>
+      <div className="rounded-2xl p-4 space-y-3 bg-white shadow-sm border border-border">
+        <h3 className="text-sm font-semibold text-[#1B2A4A] mb-1">Actions</h3>
 
         {/* Upload Statement */}
         <Link
           href="/upload"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl transition-colors hover:bg-white/5"
+          className="flex items-center gap-3 px-4 py-3 rounded-xl transition-colors hover:bg-gray-50"
         >
-          <Upload className="h-4 w-4 text-blue-400" />
-          <span className="text-sm text-white">Upload Statement</span>
+          <Upload className="h-4 w-4 text-blue-500" />
+          <span className="text-sm text-[#1B2A4A]">Upload Statement</span>
         </Link>
 
         {/* Update Balance */}
         {updatingBalance ? (
-          <div className="px-4 py-3 rounded-xl bg-white/5">
-            <p className="text-xs text-slate-400 mb-2">
+          <div className="px-4 py-3 rounded-xl bg-gray-50">
+            <p className="text-xs text-muted-foreground mb-2">
               Enter new balance
             </p>
             <div className="flex items-center gap-2">
@@ -787,7 +769,7 @@ export default function AccountDetailPage() {
                 onChange={(e) => setNewBalance(e.target.value)}
                 autoFocus
                 placeholder="0.00"
-                className="flex-1 h-10 px-3 text-sm text-white bg-white/10 border border-white/20 rounded-xl outline-none focus:border-blue-500 tabular-nums"
+                className="flex-1 h-10 px-3 text-sm text-foreground bg-gray-50 border border-border rounded-xl outline-none focus:border-blue-500 tabular-nums"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleUpdateBalance()
                   if (e.key === "Escape") setUpdatingBalance(false)
@@ -806,7 +788,7 @@ export default function AccountDetailPage() {
                   setUpdatingBalance(false)
                   setNewBalance("")
                 }}
-                className="h-10 px-3 rounded-xl text-sm text-slate-400 hover:text-white"
+                className="h-10 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground"
               >
                 Cancel
               </button>
@@ -818,22 +800,22 @@ export default function AccountDetailPage() {
               setNewBalance(String(account.balance))
               setUpdatingBalance(true)
             }}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl transition-colors hover:bg-white/5 w-full text-left"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl transition-colors hover:bg-gray-50 w-full text-left"
           >
-            <Pencil className="h-4 w-4 text-blue-400" />
-            <span className="text-sm text-white">Update Balance</span>
+            <Pencil className="h-4 w-4 text-blue-500" />
+            <span className="text-sm text-[#1B2A4A]">Update Balance</span>
           </button>
         )}
 
         {/* Delete Account */}
         {showDeleteConfirm ? (
-          <div className="px-4 py-3 rounded-xl border border-red-500/20 bg-red-500/5">
-            <p className="text-sm text-red-300 font-medium mb-1">
+          <div className="px-4 py-3 rounded-xl border border-red-200 bg-red-50">
+            <p className="text-sm text-red-600 font-medium mb-1">
               Delete this account?
             </p>
-            <p className="text-xs text-slate-400 mb-3">
+            <p className="text-xs text-muted-foreground mb-3">
               This will permanently delete{" "}
-              <span className="text-white font-medium">{txCount}</span>{" "}
+              <span className="text-foreground font-medium">{txCount}</span>{" "}
               transaction{txCount !== 1 ? "s" : ""} and all balance
               snapshots.
             </p>
@@ -847,7 +829,7 @@ export default function AccountDetailPage() {
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="h-9 px-4 rounded-xl text-sm text-slate-400 hover:text-white"
+                className="h-9 px-4 rounded-xl text-sm text-muted-foreground hover:text-foreground"
               >
                 Cancel
               </button>
@@ -856,10 +838,10 @@ export default function AccountDetailPage() {
         ) : (
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl transition-colors hover:bg-red-500/5 w-full text-left"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl transition-colors hover:bg-red-50 w-full text-left"
           >
-            <Trash2 className="h-4 w-4 text-red-400" />
-            <span className="text-sm text-red-400">Delete Account</span>
+            <Trash2 className="h-4 w-4 text-red-500" />
+            <span className="text-sm text-red-500">Delete Account</span>
           </button>
         )}
       </div>

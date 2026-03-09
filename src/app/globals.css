@@ -3,28 +3,30 @@
 @tailwind utilities;
 
 @layer base {
-  /* CardPulse v4 — Dark Navy Theme (always dark) */
+  /* CardPulse v4 — Bright White Theme with Navy Accents */
   :root {
-    --background: 220 50% 4%;        /* #0A1628 */
-    --foreground: 0 0% 98%;          /* white text */
-    --card: 220 40% 11%;             /* #1B2A4A */
-    --card-foreground: 0 0% 98%;
-    --primary: 217 70% 50%;          /* accent blue */
-    --primary-foreground: 0 0% 98%;
-    --secondary: 220 30% 16%;        /* slightly lighter navy */
-    --secondary-foreground: 0 0% 85%;
-    --muted: 220 30% 16%;
-    --muted-foreground: 220 10% 55%;
+    --background: 0 0% 99%;             /* #FCFCFC near-white */
+    --foreground: 220 40% 13%;          /* #1B2A4A navy text */
+    --card: 0 0% 100%;                  /* pure white cards */
+    --card-foreground: 220 40% 13%;
+    --primary: 217 70% 50%;             /* accent blue */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 20% 96%;           /* very light grey */
+    --secondary-foreground: 220 30% 30%;
+    --muted: 220 14% 95%;              /* light grey */
+    --muted-foreground: 220 10% 46%;   /* medium grey */
     --accent: 217 70% 50%;
-    --accent-foreground: 0 0% 98%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 220 30% 18%;
-    --input: 220 30% 18%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 90%;             /* light grey border */
+    --input: 220 13% 90%;
     --ring: 217 70% 50%;
     --radius: 0.75rem;
     --success: 152 69% 41%;
     --warning: 38 92% 50%;
+    --navy: 220 40% 13%;               /* #1B2A4A for accents */
+    --navy-light: 220 30% 25%;         /* lighter navy */
   }
 }
 

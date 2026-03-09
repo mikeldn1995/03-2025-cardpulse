@@ -160,20 +160,14 @@ export default function InsightsPage() {
   if (transactions.length === 0) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <div
-          className="w-full rounded-2xl p-8 text-center"
-          style={{ backgroundColor: "#1B2A4A" }}
-        >
-          <div
-            className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-          >
-            <Upload className="h-7 w-7 text-slate-300" />
+        <div className="w-full rounded-2xl p-8 text-center bg-white shadow-sm border border-border">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+            <Upload className="h-7 w-7 text-gray-300" />
           </div>
-          <h2 className="mb-2 text-lg font-semibold text-white">
+          <h2 className="mb-2 text-lg font-semibold text-[#1B2A4A]">
             No spending data yet
           </h2>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-muted-foreground">
             Upload statements to see spending insights
           </p>
         </div>
@@ -185,40 +179,37 @@ export default function InsightsPage() {
     <div className="space-y-4 pb-8">
       {/* Header */}
       <div>
-        <h1 className="text-lg font-bold text-white">Spending Insights</h1>
-        <p className="text-sm text-slate-400">See where your money goes</p>
+        <h1 className="text-lg font-bold text-[#1B2A4A]">Spending Insights</h1>
+        <p className="text-sm text-muted-foreground">See where your money goes</p>
       </div>
 
       {/* Month Selector */}
-      <div
-        className="flex items-center justify-between rounded-2xl px-4 py-3"
-        style={{ backgroundColor: "#1B2A4A" }}
-      >
+      <div className="flex items-center justify-between rounded-2xl px-4 py-3 bg-white shadow-sm border border-border">
         <button
           onClick={goBack}
-          className="w-8 h-8 rounded-full flex items-center justify-center active:bg-white/10 transition-colors"
+          className="w-8 h-8 rounded-full flex items-center justify-center active:bg-gray-100 transition-colors"
         >
-          <ChevronLeft className="w-5 h-5 text-slate-400" />
+          <ChevronLeft className="w-5 h-5 text-muted-foreground" />
         </button>
-        <span className="text-sm font-semibold text-white">
+        <span className="text-sm font-semibold text-[#1B2A4A]">
           {formatMonthLabel(selectedMonth)}
         </span>
         <button
           onClick={goForward}
           disabled={selectedMonth >= currentMonth}
-          className="w-8 h-8 rounded-full flex items-center justify-center active:bg-white/10 transition-colors disabled:opacity-30"
+          className="w-8 h-8 rounded-full flex items-center justify-center active:bg-gray-100 transition-colors disabled:opacity-30"
         >
-          <ChevronRight className="w-5 h-5 text-slate-400" />
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
         </button>
       </div>
 
       {/* Total Spending */}
       {byCategory.length > 0 && (
         <div className="text-center py-2">
-          <p className="text-3xl font-bold text-white tabular-nums">
+          <p className="text-3xl font-bold text-[#1B2A4A] tabular-nums">
             {formatCurrency(totalSpending, baseCurrency)}
           </p>
-          <p className="text-xs text-slate-400 uppercase tracking-wider mt-1">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider mt-1">
             Total spending
           </p>
         </div>
@@ -226,11 +217,8 @@ export default function InsightsPage() {
 
       {/* No data for selected month */}
       {byCategory.length === 0 && (
-        <div
-          className="rounded-2xl px-6 py-10 text-center"
-          style={{ backgroundColor: "#1B2A4A" }}
-        >
-          <p className="text-sm text-slate-400">
+        <div className="rounded-2xl px-6 py-10 text-center bg-white shadow-sm border border-border">
+          <p className="text-sm text-muted-foreground">
             No spending transactions for {formatMonthLabel(selectedMonth)}
           </p>
         </div>
@@ -238,13 +226,13 @@ export default function InsightsPage() {
 
       {/* Spending by Category */}
       {byCategory.length > 0 && (
-        <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "#1B2A4A" }}>
+        <div className="rounded-2xl overflow-hidden bg-white shadow-sm border border-border">
           <div className="px-4 pt-4 pb-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               By Category
             </p>
           </div>
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-border">
             {byCategory.map(({ category, total }) => {
               const Icon = CATEGORY_ICONS[category] || HelpCircle
               const color = CATEGORY_COLORS[category] || "#64748B"
@@ -265,7 +253,7 @@ export default function InsightsPage() {
                       >
                         <Icon className="w-3.5 h-3.5" style={{ color }} />
                       </div>
-                      <span className="text-sm font-medium text-white truncate">
+                      <span className="text-sm font-medium text-[#1B2A4A] truncate">
                         {category}
                       </span>
                     </div>
@@ -286,16 +274,13 @@ export default function InsightsPage() {
                           {change}%
                         </span>
                       )}
-                      <span className="text-sm font-semibold text-white tabular-nums">
+                      <span className="text-sm font-semibold text-[#1B2A4A] tabular-nums">
                         {formatCurrency(total, baseCurrency)}
                       </span>
                     </div>
                   </div>
                   {/* Progress bar */}
-                  <div
-                    className="h-1.5 rounded-full overflow-hidden"
-                    style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-                  >
+                  <div className="h-1.5 rounded-full overflow-hidden bg-gray-100">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{
@@ -313,26 +298,22 @@ export default function InsightsPage() {
 
       {/* Top Merchants */}
       {topDescriptions.length > 0 && (
-        <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "#1B2A4A" }}>
+        <div className="rounded-2xl overflow-hidden bg-white shadow-sm border border-border">
           <div className="px-4 pt-4 pb-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Top Merchants
             </p>
           </div>
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-border">
             {topDescriptions.map(({ description, total }, i) => (
               <div key={description} className="flex items-center gap-3 px-4 py-3">
                 <span
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[0.625rem] font-bold shrink-0"
-                  style={{
-                    backgroundColor: "rgba(255,255,255,0.06)",
-                    color: "#94A3B8",
-                  }}
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-[0.625rem] font-bold shrink-0 bg-gray-100 text-muted-foreground"
                 >
                   {i + 1}
                 </span>
-                <span className="text-sm text-white truncate flex-1">{description}</span>
-                <span className="text-sm font-semibold text-white tabular-nums shrink-0">
+                <span className="text-sm text-[#1B2A4A] truncate flex-1">{description}</span>
+                <span className="text-sm font-semibold text-[#1B2A4A] tabular-nums shrink-0">
                   {formatCurrency(total, baseCurrency)}
                 </span>
               </div>

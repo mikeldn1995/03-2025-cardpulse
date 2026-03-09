@@ -13,26 +13,31 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #0A1628, #1B2A4A)",
+          background: "#1B2A4A",
           borderRadius: 38,
         }}
       >
         <svg
-          width="120"
-          height="120"
-          viewBox="0 0 512 512"
+          width="110"
+          height="110"
+          viewBox="0 0 48 48"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <rect x="56" y="116" width="400" height="280" rx="32" fill="white" opacity="0.95" />
-          <rect x="116" y="166" width="64" height="48" rx="8" fill="#3b82f6" opacity="0.3" />
-          <polyline
-            points="56,296 156,296 196,216 256,356 316,236 356,296 456,296"
+          <path
+            d="M28 14a12 12 0 1 0 0 20"
+            stroke="white"
+            strokeWidth="3"
+            strokeLinecap="round"
             fill="none"
+          />
+          <path
+            d="M10 24h8l3-6 4 12 3-6h10"
             stroke="#3b82f6"
-            strokeWidth="22"
+            strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
+            fill="none"
           />
         </svg>
       </div>

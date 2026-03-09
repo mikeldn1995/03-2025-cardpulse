@@ -101,7 +101,7 @@ export default function DigestPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-pulse text-white/40">Generating digest...</div>
+        <div className="animate-pulse text-muted-foreground">Generating digest...</div>
       </div>
     )
   }
@@ -109,7 +109,7 @@ export default function DigestPage() {
   if (!data) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-white/40">Unable to load digest data.</p>
+        <p className="text-muted-foreground">Unable to load digest data.</p>
       </div>
     )
   }
@@ -121,13 +121,13 @@ export default function DigestPage() {
       {/* Screen controls (hidden in print) */}
       <div className="print:hidden flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <button onClick={goPrev} className="p-2 rounded-xl bg-[#1B2A4A] text-white/60">
+          <button onClick={goPrev} className="p-2 rounded-xl bg-white shadow-sm border border-border text-muted-foreground">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <span className="text-white font-medium text-sm min-w-[140px] text-center">
+          <span className="text-[#1B2A4A] font-medium text-sm min-w-[140px] text-center">
             {data.monthName}
           </span>
-          <button onClick={goNext} className="p-2 rounded-xl bg-[#1B2A4A] text-white/60">
+          <button onClick={goNext} className="p-2 rounded-xl bg-white shadow-sm border border-border text-muted-foreground">
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
@@ -143,18 +143,18 @@ export default function DigestPage() {
       {/* Printable digest */}
       <div ref={printRef} className="digest-page space-y-5">
         {/* Header */}
-        <div className="bg-[#1B2A4A] rounded-2xl p-6 print:bg-[#0A1628] print:border print:border-gray-700">
+        <div className="bg-white shadow-sm border border-border rounded-2xl p-6 print:bg-white print:border print:border-gray-300">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <Logo size={32} variant="dark" />
+              <Logo size={32} />
               <div>
-                <h1 className="text-white font-bold text-lg">CardPulse</h1>
-                <p className="text-white/40 text-xs">Monthly Financial Digest</p>
+                <h1 className="text-[#1B2A4A] font-bold text-lg">CardPulse</h1>
+                <p className="text-muted-foreground text-xs">Monthly Financial Digest</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-white font-semibold text-sm">{data.monthName}</p>
-              <p className="text-white/40 text-xs">Prepared for {data.userName}</p>
+              <p className="text-[#1B2A4A] font-semibold text-sm">{data.monthName}</p>
+              <p className="text-muted-foreground text-xs">Prepared for {data.userName}</p>
             </div>
           </div>
 
@@ -164,7 +164,7 @@ export default function DigestPage() {
               <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                 <circle
                   cx="50" cy="50" r="42"
-                  fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8"
+                  fill="none" stroke="rgba(27,42,74,0.1)" strokeWidth="8"
                 />
                 <circle
                   cx="50" cy="50" r="42"
@@ -176,15 +176,15 @@ export default function DigestPage() {
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-white font-bold text-lg">{data.healthScore}</span>
+                <span className="text-[#1B2A4A] font-bold text-lg">{data.healthScore}</span>
               </div>
             </div>
             <div>
-              <p className="text-white/60 text-xs uppercase tracking-wider">Financial Health</p>
-              <p className="text-white font-semibold text-base" style={{ color: healthColor(data.healthScore) }}>
+              <p className="text-muted-foreground text-xs uppercase tracking-wider">Financial Health</p>
+              <p className="text-[#1B2A4A] font-semibold text-base" style={{ color: healthColor(data.healthScore) }}>
                 {healthLabel(data.healthScore)}
               </p>
-              <p className="text-white/40 text-xs mt-1">
+              <p className="text-muted-foreground text-xs mt-1">
                 {data.savingsRate > 0 ? `${data.savingsRate}% savings rate` : "No savings this month"}
               </p>
             </div>
@@ -205,15 +205,15 @@ export default function DigestPage() {
             {data.accountSummaries.map((a) => (
               <div key={a.id} className="flex items-center justify-between py-1.5">
                 <div className="min-w-0 flex-1">
-                  <p className="text-white text-sm truncate">
+                  <p className="text-[#1B2A4A] text-sm truncate">
                     {a.institution} {a.accountName}
                   </p>
-                  <p className="text-white/30 text-xs capitalize">
+                  <p className="text-gray-400 text-xs capitalize">
                     {a.category.replace("_", " ")}
                   </p>
                 </div>
                 <div className="text-right shrink-0 ml-3">
-                  <p className="text-white text-sm font-medium">{fmt(a.balance, a.currency)}</p>
+                  <p className="text-[#1B2A4A] text-sm font-medium">{fmt(a.balance, a.currency)}</p>
                   {a.change != null && (
                     <p className={`text-xs ${a.change >= 0 ? "text-green-400" : "text-red-400"}`}>
                       {a.change >= 0 ? "+" : ""}{fmt(a.change, a.currency)}
@@ -224,7 +224,7 @@ export default function DigestPage() {
             ))}
           </div>
           {data.accountSummaries.length === 0 && (
-            <p className="text-white/30 text-sm text-center py-4">No accounts found</p>
+            <p className="text-gray-400 text-sm text-center py-4">No accounts found</p>
           )}
         </Section>
 
@@ -234,9 +234,9 @@ export default function DigestPage() {
             {data.categorySpending.map((c) => (
               <div key={c.category}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-white/80 text-sm">{c.category}</span>
+                  <span className="text-[#1B2A4A]/80 text-sm">{c.category}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-white text-sm font-medium">{fmt(c.amount)}</span>
+                    <span className="text-[#1B2A4A] text-sm font-medium">{fmt(c.amount)}</span>
                     {c.change != null && (
                       <span
                         className={`text-xs ${c.change <= 0 ? "text-green-400" : "text-red-400"}`}
@@ -246,7 +246,7 @@ export default function DigestPage() {
                     )}
                   </div>
                 </div>
-                <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-[hsl(217,70%,50%)] rounded-full transition-all"
                     style={{ width: `${(c.amount / maxCatSpend) * 100}%` }}
@@ -256,7 +256,7 @@ export default function DigestPage() {
             ))}
           </div>
           {data.categorySpending.length === 0 && (
-            <p className="text-white/30 text-sm text-center py-4">No spending this month</p>
+            <p className="text-gray-400 text-sm text-center py-4">No spending this month</p>
           )}
         </Section>
 
@@ -266,18 +266,18 @@ export default function DigestPage() {
             {data.topMerchants.map((m, i) => (
               <div key={m.name} className="flex items-center justify-between py-1">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="text-white/30 text-xs w-5 shrink-0">{i + 1}.</span>
-                  <span className="text-white/80 text-sm truncate">{m.name}</span>
+                  <span className="text-gray-400 text-xs w-5 shrink-0">{i + 1}.</span>
+                  <span className="text-[#1B2A4A]/80 text-sm truncate">{m.name}</span>
                 </div>
                 <div className="text-right shrink-0 ml-3">
-                  <span className="text-white text-sm font-medium">{fmt(m.total)}</span>
-                  <span className="text-white/30 text-xs ml-2">x{m.count}</span>
+                  <span className="text-[#1B2A4A] text-sm font-medium">{fmt(m.total)}</span>
+                  <span className="text-gray-400 text-xs ml-2">x{m.count}</span>
                 </div>
               </div>
             ))}
           </div>
           {data.topMerchants.length === 0 && (
-            <p className="text-white/30 text-sm text-center py-4">No transactions this month</p>
+            <p className="text-gray-400 text-sm text-center py-4">No transactions this month</p>
           )}
         </Section>
 
@@ -286,17 +286,17 @@ export default function DigestPage() {
           <Section title="Debt Forecast">
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-white/60 text-sm">Current total debt</span>
-                <span className="text-white text-sm font-medium">{fmt(data.totalDebt)}</span>
+                <span className="text-muted-foreground text-sm">Current total debt</span>
+                <span className="text-[#1B2A4A] text-sm font-medium">{fmt(data.totalDebt)}</span>
               </div>
               {data.forecastPayoffMonth != null && (
                 <div className="flex justify-between">
-                  <span className="text-white/60 text-sm">Est. payoff (min payments)</span>
-                  <span className="text-white text-sm font-medium">{data.forecastPayoffMonth} months</span>
+                  <span className="text-muted-foreground text-sm">Est. payoff (min payments)</span>
+                  <span className="text-[#1B2A4A] text-sm font-medium">{data.forecastPayoffMonth} months</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-white/60 text-sm">Est. total interest</span>
+                <span className="text-muted-foreground text-sm">Est. total interest</span>
                 <span className="text-red-400 text-sm font-medium">{fmt(data.forecastTotalInterest)}</span>
               </div>
             </div>
@@ -320,16 +320,16 @@ export default function DigestPage() {
         {/* Notes Section (blank for user to fill in) */}
         <Section title="Notes & Cash Transactions">
           <div className="space-y-4">
-            <p className="text-white/30 text-xs italic">
+            <p className="text-gray-400 text-xs italic">
               Use this section to record any cash transactions, receipts, or notes not captured in your statements.
             </p>
             <div className="space-y-3 print:space-y-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div
                   key={i}
-                  className="border-b border-white/10 pb-2 print:pb-4 print:border-gray-600"
+                  className="border-b border-border pb-2 print:pb-4 print:border-gray-300"
                 >
-                  <div className="flex gap-4 text-white/20 text-xs">
+                  <div className="flex gap-4 text-gray-300 text-xs">
                     <span className="w-20">Date: _____</span>
                     <span className="flex-1">Description: ___________________________</span>
                     <span className="w-20">Amount: ____</span>
@@ -343,10 +343,10 @@ export default function DigestPage() {
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 pb-6 print:pb-0">
           <div className="flex items-center gap-2">
-            <Logo size={16} variant="dark" />
-            <span className="text-white/20 text-xs">CardPulse v4.0</span>
+            <Logo size={16} />
+            <span className="text-gray-300 text-xs">CardPulse v4.0</span>
           </div>
-          <p className="text-white/20 text-xs">
+          <p className="text-gray-300 text-xs">
             Generated {new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
           </p>
         </div>
@@ -356,7 +356,7 @@ export default function DigestPage() {
       <style jsx global>{`
         @media print {
           body {
-            background: #0A1628 !important;
+            background: white !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -382,8 +382,8 @@ export default function DigestPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-[#1B2A4A] rounded-2xl p-5 print:bg-[#0A1628] print:border print:border-gray-700">
-      <h2 className="text-white font-semibold text-sm mb-3 uppercase tracking-wider opacity-60">
+    <div className="bg-white shadow-sm border border-border rounded-2xl p-5 print:bg-white print:border print:border-gray-300">
+      <h2 className="text-[#1B2A4A] font-semibold text-sm mb-3 uppercase tracking-wider opacity-60">
         {title}
       </h2>
       {children}
@@ -401,8 +401,8 @@ function SummaryCard({
   color: string
 }) {
   return (
-    <div className="bg-[#1B2A4A] rounded-2xl p-4 print:bg-[#0A1628] print:border print:border-gray-700">
-      <p className="text-white/40 text-xs mb-1">{label}</p>
+    <div className="bg-white shadow-sm border border-border rounded-2xl p-4 print:bg-white print:border print:border-gray-300">
+      <p className="text-muted-foreground text-xs mb-1">{label}</p>
       <p className="text-lg font-bold" style={{ color }}>
         {value}
       </p>
@@ -413,7 +413,7 @@ function SummaryCard({
 function MiniStat({
   label,
   value,
-  color = "white",
+  color = "#1B2A4A",
 }: {
   label: string
   value: string
@@ -424,7 +424,7 @@ function MiniStat({
       <p style={{ color }} className="text-base font-bold">
         {value}
       </p>
-      <p className="text-white/30 text-xs">{label}</p>
+      <p className="text-gray-400 text-xs">{label}</p>
     </div>
   )
 }

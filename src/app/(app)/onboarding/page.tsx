@@ -108,7 +108,7 @@ export default function OnboardingPage() {
   const successCount = files.filter((f) => f.status === "success").length
 
   return (
-    <div className="min-h-dvh bg-[#0A1628] flex flex-col">
+    <div className="min-h-dvh bg-[#FCFCFC] flex flex-col">
       {/* Progress dots */}
       <div className="flex items-center justify-center gap-2 pt-8 pb-2">
         {[0, 1, 2].map((i) => (
@@ -119,7 +119,7 @@ export default function OnboardingPage() {
                 ? "w-8 bg-blue-500"
                 : i < currentStepIndex
                   ? "w-2 bg-blue-500/60"
-                  : "w-2 bg-slate-700"
+                  : "w-2 bg-gray-200"
             }`}
           />
         ))}
@@ -130,12 +130,12 @@ export default function OnboardingPage() {
         {/* Step 1: Welcome */}
         {step === "welcome" && (
           <div className="w-full max-w-sm text-center space-y-8">
-            <Logo size={72} variant="dark" className="mx-auto" />
+            <Logo size={72} className="mx-auto" />
             <div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">
+              <h1 className="text-2xl font-bold text-[#1B2A4A] tracking-tight">
                 Welcome to CardPulse
               </h1>
-              <p className="text-sm text-slate-400 mt-3 leading-relaxed max-w-xs mx-auto">
+              <p className="text-sm text-muted-foreground mt-3 leading-relaxed max-w-xs mx-auto">
                 Your personal financial aggregator. Upload bank &amp; credit card
                 statements, and let AI do the rest.
               </p>
@@ -154,10 +154,10 @@ export default function OnboardingPage() {
         {step === "upload" && (
           <div className="w-full max-w-sm space-y-6">
             <div>
-              <h2 className="text-xl font-bold text-white tracking-tight">
+              <h2 className="text-xl font-bold text-[#1B2A4A] tracking-tight">
                 Upload your statements
               </h2>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Drag and drop PDF or CSV statements, or pick files.
               </p>
             </div>
@@ -174,17 +174,17 @@ export default function OnboardingPage() {
               className={`relative flex flex-col items-center justify-center gap-3 py-12 px-4 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
                 dragOver
                   ? "border-blue-500 bg-blue-500/10"
-                  : "border-slate-600 bg-[#111D32] hover:border-slate-500"
+                  : "border-gray-300 bg-gray-50 hover:border-gray-400"
               }`}
             >
               <Upload
-                className={`w-8 h-8 ${dragOver ? "text-blue-400" : "text-slate-500"}`}
+                className={`w-8 h-8 ${dragOver ? "text-blue-400" : "text-muted-foreground"}`}
               />
               <div className="text-center">
-                <p className="text-sm font-medium text-slate-300">
+                <p className="text-sm font-medium text-foreground">
                   Drop files here or tap to browse
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   PDF or CSV statements
                 </p>
               </div>
@@ -207,7 +207,7 @@ export default function OnboardingPage() {
                 {files.map((f) => (
                   <div
                     key={f.name}
-                    className="flex items-center gap-3 py-2.5 px-3 bg-[#111D32] border border-slate-700/50 rounded-lg"
+                    className="flex items-center gap-3 py-2.5 px-3 bg-gray-50 border border-border rounded-lg"
                   >
                     <FileText
                       className={`w-4 h-4 shrink-0 ${
@@ -215,13 +215,13 @@ export default function OnboardingPage() {
                           ? "text-emerald-400"
                           : f.status === "error"
                             ? "text-red-400"
-                            : "text-slate-500"
+                            : "text-muted-foreground"
                       }`}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm text-slate-300 truncate">{f.name}</div>
+                      <div className="text-sm text-foreground truncate">{f.name}</div>
                       {f.status === "uploading" && (
-                        <div className="text-xs text-slate-500">Processing...</div>
+                        <div className="text-xs text-muted-foreground">Processing...</div>
                       )}
                       {f.status === "success" && f.accountName && (
                         <div className="text-xs text-emerald-400">{f.accountName}</div>
@@ -235,7 +235,7 @@ export default function OnboardingPage() {
                         e.stopPropagation()
                         removeFile(f.name)
                       }}
-                      className="text-slate-600 hover:text-slate-400"
+                      className="text-gray-300 hover:text-muted-foreground"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -248,7 +248,7 @@ export default function OnboardingPage() {
             <div className="flex items-center gap-3 pt-2">
               <button
                 onClick={() => setStep("welcome")}
-                className="flex items-center gap-1.5 py-3 px-4 text-sm text-slate-400 hover:text-white transition-colors"
+                className="flex items-center gap-1.5 py-3 px-4 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back
@@ -265,7 +265,7 @@ export default function OnboardingPage() {
               ) : (
                 <button
                   onClick={() => setStep("done")}
-                  className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Skip for now
                 </button>
@@ -281,10 +281,10 @@ export default function OnboardingPage() {
               <CheckCircle2 className="w-8 h-8 text-emerald-400" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white tracking-tight">
+              <h2 className="text-2xl font-bold text-[#1B2A4A] tracking-tight">
                 You&apos;re all set!
               </h2>
-              <p className="text-sm text-slate-400 mt-3 leading-relaxed">
+              <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
                 {successCount > 0
                   ? `${successCount} statement${successCount > 1 ? "s" : ""} imported successfully. Your accounts are ready to explore.`
                   : "You can upload statements anytime from the Upload page."}

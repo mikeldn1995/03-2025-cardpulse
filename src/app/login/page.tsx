@@ -75,14 +75,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#0A1628] flex items-center justify-center px-6">
+    <div className="min-h-dvh bg-[#FCFCFC] flex items-center justify-center px-6">
       <div className="w-full max-w-[360px]">
         <div className="text-center mb-10">
-          <Logo size={48} variant="dark" className="mx-auto mb-4" />
-          <h1 className="text-2xl font-semibold tracking-tight text-white">
+          <Logo size={48} className="mx-auto mb-4" />
+          <h1 className="text-2xl font-semibold tracking-tight text-[#1B2A4A]">
             {step === "email" ? "Welcome back" : "Enter your code"}
           </h1>
-          <p className="text-sm text-slate-400 mt-1.5">
+          <p className="text-sm text-muted-foreground mt-1.5">
             {step === "email"
               ? "Sign in with a one-time code sent to your email."
               : `We sent a 6-digit code to ${email}`}
@@ -92,7 +92,7 @@ export default function LoginPage() {
         {step === "email" ? (
           <form onSubmit={handleSendOtp} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              <label className="block text-sm font-medium text-foreground mb-1.5">
                 Email
               </label>
               <input
@@ -102,7 +102,7 @@ export default function LoginPage() {
                 required
                 autoFocus
                 placeholder="you@email.com"
-                className="w-full h-11 px-3 text-sm bg-[#111D32] border border-slate-700 rounded-lg text-white placeholder:text-slate-600 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                className="w-full h-11 px-3 text-sm bg-white border border-border rounded-lg text-[#1B2A4A] placeholder:text-muted-foreground outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
             {error && <p className="text-xs text-red-400">{error}</p>}
@@ -117,7 +117,7 @@ export default function LoginPage() {
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              <label className="block text-sm font-medium text-foreground mb-1.5">
                 6-digit code
               </label>
               <input
@@ -130,7 +130,7 @@ export default function LoginPage() {
                 autoFocus
                 autoComplete="one-time-code"
                 placeholder="000000"
-                className="w-full h-14 px-3 text-center text-lg tracking-[0.3em] font-mono bg-[#111D32] border border-slate-700 rounded-lg text-white placeholder:text-slate-600 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                className="w-full h-14 px-3 text-center text-lg tracking-[0.3em] font-mono bg-white border border-border rounded-lg text-[#1B2A4A] placeholder:text-muted-foreground outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
             {error && <p className="text-xs text-red-400">{error}</p>}
@@ -149,7 +149,7 @@ export default function LoginPage() {
                   setCode("")
                   setError("")
                 }}
-                className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1 transition-colors"
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
               >
                 <ArrowLeft className="w-3 h-3" /> Change email
               </button>
@@ -157,7 +157,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => handleSendOtp()}
                 disabled={loading}
-                className="text-xs text-slate-500 hover:text-slate-300 disabled:opacity-50 transition-colors"
+                className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
               >
                 Resend code
               </button>
@@ -166,11 +166,11 @@ export default function LoginPage() {
         )}
 
         <div className="text-center mt-8">
-          <p className="text-[0.8125rem] text-slate-500">
+          <p className="text-[0.8125rem] text-muted-foreground">
             Don&apos;t have an account?{" "}
             <button
               onClick={() => router.push("/register")}
-              className="font-medium text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
+              className="font-medium text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
             >
               Create one
             </button>

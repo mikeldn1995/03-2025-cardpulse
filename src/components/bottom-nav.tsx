@@ -23,7 +23,10 @@ export function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-[#1B2A4A] flex z-50 pb-[env(safe-area-inset-bottom)]">
+    <nav
+      data-bottom-nav
+      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-border flex z-50 pb-[env(safe-area-inset-bottom)]"
+    >
       {NAV_ITEMS.map((item) => {
         const active = pathname.startsWith(item.href)
 
@@ -38,8 +41,8 @@ export function BottomNav() {
                 className={cn(
                   "w-11 h-11 -mt-5 rounded-full flex items-center justify-center shadow-lg",
                   active
-                    ? "bg-[hsl(217,70%,50%)]"
-                    : "bg-[hsl(217,70%,50%)] opacity-90"
+                    ? "bg-[#1B2A4A]"
+                    : "bg-[#1B2A4A]/90"
                 )}
               >
                 <item.icon className="w-5 h-5 text-white" />
@@ -47,7 +50,7 @@ export function BottomNav() {
               <span
                 className={cn(
                   "text-[0.6rem] font-medium tracking-wide",
-                  active ? "text-white" : "text-white/50"
+                  active ? "text-[#1B2A4A]" : "text-muted-foreground"
                 )}
               >
                 {item.label}
@@ -67,13 +70,13 @@ export function BottomNav() {
             <item.icon
               className={cn(
                 "w-5 h-5",
-                active ? "text-[hsl(217,70%,50%)]" : "text-white/40"
+                active ? "text-[#1B2A4A]" : "text-muted-foreground"
               )}
             />
             <span
               className={cn(
                 "text-[0.6rem] font-medium tracking-wide",
-                active ? "text-white" : "text-white/50"
+                active ? "text-[#1B2A4A]" : "text-muted-foreground"
               )}
             >
               {item.label}

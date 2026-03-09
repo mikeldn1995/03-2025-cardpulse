@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "CardPulse",
   },
 }
@@ -22,13 +22,13 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#0A1628",
+  themeColor: "#ffffff",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} min-h-dvh bg-[#0A1628] text-white antialiased`}>
+      <body className={`${inter.className} min-h-dvh bg-[#FCFCFC] text-[#1B2A4A] antialiased`}>
         <StoreProvider>
           <ToastProvider>
             <div className="max-w-[430px] mx-auto min-h-dvh relative flex flex-col">

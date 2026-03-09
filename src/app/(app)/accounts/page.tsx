@@ -109,7 +109,7 @@ export default function AccountsListPage() {
     <div className="space-y-5 pb-8">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-white">Accounts</h1>
+        <h1 className="text-lg font-bold text-[#1B2A4A]">Accounts</h1>
         <button
           onClick={() => setShowForm(!showForm)}
           className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
@@ -131,16 +131,13 @@ export default function AccountsListPage() {
 
       {/* Inline Add Form */}
       {showForm && (
-        <div
-          className="rounded-2xl p-5 space-y-4"
-          style={{ backgroundColor: "#1B2A4A" }}
-        >
-          <h2 className="text-sm font-semibold text-white">New Account</h2>
+        <div className="rounded-2xl p-5 space-y-4 bg-white shadow-sm border border-border">
+          <h2 className="text-sm font-semibold text-[#1B2A4A]">New Account</h2>
 
           <div className="grid grid-cols-2 gap-3">
             {/* Institution */}
             <div className="col-span-2">
-              <label className="block text-xs text-slate-400 mb-1">
+              <label className="block text-xs text-muted-foreground mb-1">
                 Institution Name
               </label>
               <input
@@ -150,13 +147,13 @@ export default function AccountsListPage() {
                   setForm((f) => ({ ...f, institution: e.target.value }))
                 }
                 placeholder="e.g. Barclays"
-                className="w-full h-10 px-3 text-sm text-white bg-white/5 border border-white/10 rounded-xl outline-none focus:border-blue-500 placeholder:text-slate-500"
+                className="w-full h-10 px-3 text-sm text-foreground bg-gray-50 border border-border rounded-xl outline-none focus:border-blue-500 placeholder:text-muted-foreground"
               />
             </div>
 
             {/* Account Name */}
             <div className="col-span-2">
-              <label className="block text-xs text-slate-400 mb-1">
+              <label className="block text-xs text-muted-foreground mb-1">
                 Account Name
               </label>
               <input
@@ -166,13 +163,13 @@ export default function AccountsListPage() {
                   setForm((f) => ({ ...f, accountName: e.target.value }))
                 }
                 placeholder="e.g. Everyday Saver"
-                className="w-full h-10 px-3 text-sm text-white bg-white/5 border border-white/10 rounded-xl outline-none focus:border-blue-500 placeholder:text-slate-500"
+                className="w-full h-10 px-3 text-sm text-foreground bg-gray-50 border border-border rounded-xl outline-none focus:border-blue-500 placeholder:text-muted-foreground"
               />
             </div>
 
             {/* Category */}
             <div>
-              <label className="block text-xs text-slate-400 mb-1">
+              <label className="block text-xs text-muted-foreground mb-1">
                 Category
               </label>
               <select
@@ -183,7 +180,7 @@ export default function AccountsListPage() {
                     category: e.target.value as AccountCategory,
                   }))
                 }
-                className="w-full h-10 px-3 text-sm text-white bg-white/5 border border-white/10 rounded-xl outline-none focus:border-blue-500 appearance-none"
+                className="w-full h-10 px-3 text-sm text-foreground bg-gray-50 border border-border rounded-xl outline-none focus:border-blue-500 appearance-none"
               >
                 {ACCOUNT_CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
@@ -195,7 +192,7 @@ export default function AccountsListPage() {
 
             {/* Last 4 */}
             <div>
-              <label className="block text-xs text-slate-400 mb-1">
+              <label className="block text-xs text-muted-foreground mb-1">
                 Last 4 Digits
               </label>
               <input
@@ -209,13 +206,13 @@ export default function AccountsListPage() {
                 }
                 placeholder="1234"
                 maxLength={4}
-                className="w-full h-10 px-3 text-sm text-white bg-white/5 border border-white/10 rounded-xl outline-none focus:border-blue-500 placeholder:text-slate-500 font-mono"
+                className="w-full h-10 px-3 text-sm text-foreground bg-gray-50 border border-border rounded-xl outline-none focus:border-blue-500 placeholder:text-muted-foreground font-mono"
               />
             </div>
 
             {/* Currency */}
             <div>
-              <label className="block text-xs text-slate-400 mb-1">
+              <label className="block text-xs text-muted-foreground mb-1">
                 Currency
               </label>
               <select
@@ -223,7 +220,7 @@ export default function AccountsListPage() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, currency: e.target.value }))
                 }
-                className="w-full h-10 px-3 text-sm text-white bg-white/5 border border-white/10 rounded-xl outline-none focus:border-blue-500 appearance-none"
+                className="w-full h-10 px-3 text-sm text-foreground bg-gray-50 border border-border rounded-xl outline-none focus:border-blue-500 appearance-none"
               >
                 <option value="GBP">GBP</option>
                 <option value="EUR">EUR</option>
@@ -233,7 +230,7 @@ export default function AccountsListPage() {
 
             {/* Balance */}
             <div>
-              <label className="block text-xs text-slate-400 mb-1">
+              <label className="block text-xs text-muted-foreground mb-1">
                 Balance
               </label>
               <input
@@ -243,15 +240,15 @@ export default function AccountsListPage() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, balance: e.target.value }))
                 }
-                className="w-full h-10 px-3 text-sm text-white bg-white/5 border border-white/10 rounded-xl outline-none focus:border-blue-500 tabular-nums"
+                className="w-full h-10 px-3 text-sm text-foreground bg-gray-50 border border-border rounded-xl outline-none focus:border-blue-500 tabular-nums"
               />
             </div>
 
             {/* Credit Limit (optional) */}
             <div className="col-span-2">
-              <label className="block text-xs text-slate-400 mb-1">
+              <label className="block text-xs text-muted-foreground mb-1">
                 Credit Limit{" "}
-                <span className="text-slate-500">(optional)</span>
+                <span className="text-muted-foreground">(optional)</span>
               </label>
               <input
                 type="number"
@@ -261,7 +258,7 @@ export default function AccountsListPage() {
                   setForm((f) => ({ ...f, creditLimit: e.target.value }))
                 }
                 placeholder="Leave blank if N/A"
-                className="w-full h-10 px-3 text-sm text-white bg-white/5 border border-white/10 rounded-xl outline-none focus:border-blue-500 placeholder:text-slate-500 tabular-nums"
+                className="w-full h-10 px-3 text-sm text-foreground bg-gray-50 border border-border rounded-xl outline-none focus:border-blue-500 placeholder:text-muted-foreground tabular-nums"
               />
             </div>
           </div>
@@ -279,11 +276,8 @@ export default function AccountsListPage() {
 
       {/* Empty State */}
       {accounts.length === 0 && !showForm && (
-        <div
-          className="rounded-2xl p-8 text-center"
-          style={{ backgroundColor: "#1B2A4A" }}
-        >
-          <p className="text-sm text-slate-400 mb-4">
+        <div className="rounded-2xl p-8 text-center bg-white shadow-sm border border-border">
+          <p className="text-sm text-muted-foreground mb-4">
             No accounts yet. Add your first account to get started.
           </p>
           <button
@@ -307,10 +301,10 @@ export default function AccountsListPage() {
             <div key={cat}>
               {/* Group Header */}
               <div className="mb-2.5 flex items-center justify-between px-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {categoryLabel(cat)}
                 </span>
-                <span className="text-xs font-semibold tabular-nums text-slate-300">
+                <span className="text-xs font-semibold tabular-nums text-foreground">
                   {formatCurrency(groupTotal, accts[0]?.currency ?? "GBP")}
                 </span>
               </div>
@@ -342,8 +336,7 @@ function AccountCard({ account }: { account: Account }) {
   return (
     <Link
       href={`/accounts/${account.id}`}
-      className="flex items-center gap-3.5 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98]"
-      style={{ backgroundColor: "#1B2A4A" }}
+      className="flex items-center gap-3.5 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98] bg-white shadow-sm border border-border"
     >
       {/* Logo / Initials */}
       <div
@@ -365,31 +358,31 @@ function AccountCard({ account }: { account: Account }) {
       {/* Name + Details */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-semibold text-white">
+          <span className="truncate text-sm font-semibold text-[#1B2A4A]">
             {account.accountName || account.institution}
           </span>
           {account.last4 && (
-            <span className="shrink-0 text-xs text-slate-500 font-mono">
+            <span className="shrink-0 text-xs text-muted-foreground font-mono">
               ••{account.last4}
             </span>
           )}
         </div>
-        <p className="text-xs text-slate-400 mt-0.5">
+        <p className="text-xs text-muted-foreground mt-0.5">
           {account.institution}
           {account.currency !== "GBP" && (
-            <span className="ml-1.5 text-slate-500">{account.currency}</span>
+            <span className="ml-1.5 text-muted-foreground">{account.currency}</span>
           )}
         </p>
       </div>
 
       {/* Balance */}
       <div className="shrink-0 text-right">
-        <span className="text-sm font-semibold tabular-nums text-white">
+        <span className="text-sm font-semibold tabular-nums text-[#1B2A4A]">
           {formatCurrency(account.balance, account.currency)}
         </span>
       </div>
 
-      <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
     </Link>
   )
 }

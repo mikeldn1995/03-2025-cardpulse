@@ -193,7 +193,7 @@ export default function TransactionsPage() {
     <div className="pb-24">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-bold text-white">Transactions</h1>
+        <h1 className="text-lg font-bold text-[#1B2A4A]">Transactions</h1>
         <div className="flex items-center gap-2">
           {needsReviewCount > 0 && (
             <span
@@ -206,9 +206,9 @@ export default function TransactionsPage() {
           <button
             onClick={() => setShowSearch((v) => !v)}
             className="flex h-8 w-8 items-center justify-center rounded-full"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
+            style={{ backgroundColor: "rgba(27,42,74,0.08)" }}
           >
-            <Search className="h-4 w-4 text-slate-300" />
+            <Search className="h-4 w-4 text-[#1B2A4A]/60" />
           </button>
         </div>
       </div>
@@ -222,8 +222,8 @@ export default function TransactionsPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search transactions..."
             autoFocus
-            className="w-full rounded-xl py-2.5 pl-10 pr-10 text-sm text-white placeholder-slate-500 outline-none"
-            style={{ backgroundColor: "#1B2A4A" }}
+            className="w-full rounded-xl py-2.5 pl-10 pr-10 text-sm text-[#1B2A4A] placeholder-gray-400 outline-none border border-border"
+            style={{ backgroundColor: "white" }}
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
           {searchQuery && (
@@ -250,7 +250,7 @@ export default function TransactionsPage() {
             style={{
               backgroundColor: accountFilter
                 ? "rgba(59,130,246,0.25)"
-                : "rgba(255,255,255,0.08)",
+                : "rgba(27,42,74,0.08)",
               color: accountFilter ? "#60A5FA" : "#94A3B8",
             }}
           >
@@ -283,7 +283,7 @@ export default function TransactionsPage() {
             style={{
               backgroundColor: categoryFilter
                 ? "rgba(59,130,246,0.25)"
-                : "rgba(255,255,255,0.08)",
+                : "rgba(27,42,74,0.08)",
               color: categoryFilter ? "#60A5FA" : "#94A3B8",
             }}
           >
@@ -318,7 +318,7 @@ export default function TransactionsPage() {
               backgroundColor:
                 datePreset === key
                   ? "rgba(59,130,246,0.25)"
-                  : "rgba(255,255,255,0.08)",
+                  : "rgba(27,42,74,0.08)",
               color: datePreset === key ? "#60A5FA" : "#94A3B8",
             }}
           >
@@ -429,8 +429,7 @@ function TransactionRow({
   return (
     <button
       onClick={onTap}
-      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all active:scale-[0.99]"
-      style={{ backgroundColor: "#1B2A4A" }}
+      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all active:scale-[0.99] bg-white shadow-sm border border-border"
     >
       {/* Logo + last4 */}
       <div className="relative shrink-0">
@@ -446,7 +445,7 @@ function TransactionRow({
               onError={() => setImgError(true)}
             />
           ) : (
-            <span className="text-[0.625rem] font-bold text-white">
+            <span className="text-[0.625rem] font-bold text-white/90">
               {initials}
             </span>
           )}
@@ -457,7 +456,7 @@ function TransactionRow({
             className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2"
             style={{
               backgroundColor: "#F59E0B",
-              borderColor: "#0F1A2E",
+              borderColor: "#ffffff",
             }}
           />
         )}
@@ -471,7 +470,7 @@ function TransactionRow({
               ••{account.last4}
             </span>
           )}
-          <span className="truncate text-sm font-medium text-white">
+          <span className="truncate text-sm font-medium text-[#1B2A4A]">
             {tx.description}
           </span>
         </div>
@@ -495,7 +494,7 @@ function TransactionRow({
           )}
           <span
             className="text-sm font-semibold tabular-nums"
-            style={{ color: isCredit ? "#4ADE80" : "#fff" }}
+            style={{ color: isCredit ? "#4ADE80" : "#1B2A4A" }}
           >
             {formatCurrency(Math.abs(tx.amount), account?.currency ?? "GBP")}
           </span>
@@ -532,8 +531,8 @@ function EditRow({
 
   return (
     <div
-      className="rounded-xl px-3 py-3 space-y-2.5"
-      style={{ backgroundColor: "#1B2A4A", border: "1px solid rgba(245,158,11,0.35)" }}
+      className="rounded-xl px-3 py-3 space-y-2.5 bg-white shadow-sm"
+      style={{ border: "1px solid rgba(245,158,11,0.35)" }}
     >
       <div className="flex items-center gap-2">
         <span className="text-[0.625rem] font-medium uppercase tracking-wider text-amber-400">
@@ -550,15 +549,15 @@ function EditRow({
         type="text"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        className="w-full rounded-lg px-3 py-2 text-sm text-white outline-none"
-        style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+        className="w-full rounded-lg px-3 py-2 text-sm text-[#1B2A4A] outline-none border border-border"
+        style={{ backgroundColor: "#f9fafb" }}
       />
 
       <select
         value={category}
         onChange={(e) => setCategory(e.target.value)}
-        className="w-full rounded-lg px-3 py-2 text-sm text-white outline-none appearance-none"
-        style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+        className="w-full rounded-lg px-3 py-2 text-sm text-[#1B2A4A] outline-none appearance-none border border-border"
+        style={{ backgroundColor: "#f9fafb" }}
       >
         {TRANSACTION_CATEGORIES.map((cat) => (
           <option key={cat} value={cat} className="bg-slate-800">
@@ -570,8 +569,8 @@ function EditRow({
       <div className="flex items-center gap-2 justify-end">
         <button
           onClick={onCancel}
-          className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+          className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground border border-border"
+          style={{ backgroundColor: "#f9fafb" }}
         >
           <X className="h-3 w-3" /> Cancel
         </button>
@@ -618,8 +617,7 @@ function AccountDropdown({
   return (
     <div
       ref={ref}
-      className="absolute left-0 top-full mt-1.5 z-40 w-56 rounded-xl py-1.5 shadow-xl"
-      style={{ backgroundColor: "#1B2A4A", border: "1px solid rgba(255,255,255,0.1)" }}
+      className="absolute left-0 top-full mt-1.5 z-40 w-56 rounded-xl py-1.5 shadow-xl bg-white border border-border"
     >
       <button
         onClick={() => onSelect(null)}
@@ -633,7 +631,7 @@ function AccountDropdown({
           key={a.id}
           onClick={() => onSelect(a.id)}
           className="w-full px-3.5 py-2 text-left text-xs font-medium transition-colors"
-          style={{ color: selected === a.id ? "#60A5FA" : "#CBD5E1" }}
+          style={{ color: selected === a.id ? "#3B82F6" : "#1B2A4A" }}
         >
           {a.institution} ••{a.last4}
         </button>
@@ -665,8 +663,7 @@ function CategoryDropdown({
   return (
     <div
       ref={ref}
-      className="absolute left-0 top-full mt-1.5 z-40 w-48 max-h-64 overflow-y-auto rounded-xl py-1.5 shadow-xl"
-      style={{ backgroundColor: "#1B2A4A", border: "1px solid rgba(255,255,255,0.1)" }}
+      className="absolute left-0 top-full mt-1.5 z-40 w-48 max-h-64 overflow-y-auto rounded-xl py-1.5 shadow-xl bg-white border border-border"
     >
       <button
         onClick={() => onSelect(null)}
@@ -682,7 +679,7 @@ function CategoryDropdown({
             key={cat}
             onClick={() => onSelect(cat)}
             className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-xs font-medium transition-colors"
-            style={{ color: selected === cat ? "#60A5FA" : "#CBD5E1" }}
+            style={{ color: selected === cat ? "#3B82F6" : "#1B2A4A" }}
           >
             <span
               className="h-2 w-2 rounded-full shrink-0"
@@ -812,14 +809,13 @@ function AddTransactionSheet({
 
       {/* Sheet */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl px-5 pt-5 pb-8 max-h-[85vh] overflow-y-auto"
-        style={{ backgroundColor: "#0F1A2E" }}
+        className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl px-5 pt-5 pb-8 max-h-[85vh] overflow-y-auto bg-white border-t border-border shadow-2xl"
       >
         {/* Handle */}
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-600" />
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-300" />
 
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-bold text-white">Add Transaction</h2>
+          <h2 className="text-base font-bold text-[#1B2A4A]">Add Transaction</h2>
           <button onClick={onClose}>
             <X className="h-5 w-5 text-slate-400" />
           </button>
@@ -828,21 +824,20 @@ function AddTransactionSheet({
         <div className="space-y-4">
           {/* Date */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-400">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Date
             </label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none"
-              style={{ backgroundColor: "#1B2A4A" }}
+              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-[#1B2A4A] outline-none border border-border bg-gray-50"
             />
           </div>
 
           {/* Amount */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-400">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Amount
             </label>
             <input
@@ -852,14 +847,13 @@ function AddTransactionSheet({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
-              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 outline-none"
-              style={{ backgroundColor: "#1B2A4A" }}
+              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-[#1B2A4A] placeholder-gray-400 outline-none border border-border bg-gray-50"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-400">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Description
             </label>
             <input
@@ -867,24 +861,22 @@ function AddTransactionSheet({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g. Tesco, Netflix, Salary"
-              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 outline-none"
-              style={{ backgroundColor: "#1B2A4A" }}
+              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-[#1B2A4A] placeholder-gray-400 outline-none border border-border bg-gray-50"
             />
           </div>
 
           {/* Account */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-400">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Account
             </label>
             <select
               value={accountId}
               onChange={(e) => setAccountId(Number(e.target.value))}
-              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none appearance-none"
-              style={{ backgroundColor: "#1B2A4A" }}
+              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-[#1B2A4A] outline-none appearance-none border border-border bg-gray-50"
             >
               {accounts.map((a) => (
-                <option key={a.id} value={a.id} className="bg-slate-800">
+                <option key={a.id} value={a.id} className="bg-white">
                   {a.institution} ••{a.last4} ({a.accountName})
                 </option>
               ))}
@@ -893,17 +885,16 @@ function AddTransactionSheet({
 
           {/* Category */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-400">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Category
             </label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none appearance-none"
-              style={{ backgroundColor: "#1B2A4A" }}
+              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-[#1B2A4A] outline-none appearance-none border border-border bg-gray-50"
             >
               {TRANSACTION_CATEGORIES.map((cat) => (
-                <option key={cat} value={cat} className="bg-slate-800">
+                <option key={cat} value={cat} className="bg-white">
                   {cat}
                 </option>
               ))}
@@ -912,7 +903,7 @@ function AddTransactionSheet({
 
           {/* Transfer toggle */}
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-slate-400">
+            <label className="text-xs font-medium text-muted-foreground">
               Transfer between accounts
             </label>
             <button
@@ -921,7 +912,7 @@ function AddTransactionSheet({
               style={{
                 backgroundColor: isTransfer
                   ? "#3B82F6"
-                  : "rgba(255,255,255,0.12)",
+                  : "rgba(27,42,74,0.12)",
               }}
             >
               <span
@@ -936,19 +927,18 @@ function AddTransactionSheet({
           {/* Destination account (if transfer) */}
           {isTransfer && (
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-400">
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
                 Destination Account
               </label>
               <select
                 value={destAccountId}
                 onChange={(e) => setDestAccountId(Number(e.target.value))}
-                className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none appearance-none"
-                style={{ backgroundColor: "#1B2A4A" }}
+                className="w-full rounded-xl px-3.5 py-2.5 text-sm text-[#1B2A4A] outline-none appearance-none border border-border bg-gray-50"
               >
                 {accounts
                   .filter((a) => a.id !== accountId)
                   .map((a) => (
-                    <option key={a.id} value={a.id} className="bg-slate-800">
+                    <option key={a.id} value={a.id} className="bg-white">
                       {a.institution} ••{a.last4} ({a.accountName})
                     </option>
                   ))}

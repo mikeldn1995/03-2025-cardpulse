@@ -90,20 +90,14 @@ export default function ForecastPage() {
   if (debtAccounts.length === 0) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <div
-          className="w-full rounded-2xl p-8 text-center"
-          style={{ backgroundColor: "#1B2A4A" }}
-        >
-          <div
-            className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-          >
+        <div className="w-full rounded-2xl p-8 text-center bg-white shadow-sm border border-border">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
             <PiggyBank className="h-7 w-7 text-emerald-400" />
           </div>
-          <h2 className="mb-2 text-lg font-semibold text-white">
+          <h2 className="mb-2 text-lg font-semibold text-[#1B2A4A]">
             No debts to forecast
           </h2>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-muted-foreground">
             You&apos;re debt-free! Nothing to project here.
           </p>
         </div>
@@ -117,10 +111,10 @@ export default function ForecastPage() {
     <div className="space-y-4 pb-8">
       {/* Header */}
       <div>
-        <h1 className="text-lg font-bold text-white">Payoff Forecast</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-lg font-bold text-[#1B2A4A]">Payoff Forecast</h1>
+        <p className="text-sm text-muted-foreground">
           {debtAccounts.length} debt account{debtAccounts.length !== 1 ? "s" : ""} totalling{" "}
-          <span className="font-semibold text-white">
+          <span className="font-semibold text-[#1B2A4A]">
             {formatCurrency(totalDebt, baseCurrency)}
           </span>
         </p>
@@ -128,18 +122,18 @@ export default function ForecastPage() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl p-4" style={{ backgroundColor: "#1B2A4A" }}>
+        <div className="rounded-2xl p-4 bg-white shadow-sm border border-border">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-4 h-4 text-[hsl(217,70%,50%)]" />
-            <span className="text-[0.6875rem] uppercase tracking-wider text-slate-400 font-medium">
+            <span className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium">
               {forecast.payoffMonthCustom !== null ? "Debt-free in" : "Payoff timeline"}
             </span>
           </div>
-          <div className="text-xl font-bold text-white">
+          <div className="text-xl font-bold text-[#1B2A4A]">
             {forecast.payoffMonthCustom !== null ? (
               <>
                 {forecast.payoffMonthCustom}{" "}
-                <span className="text-sm font-medium text-slate-400">
+                <span className="text-sm font-medium text-muted-foreground">
                   {forecast.payoffMonthCustom === 1 ? "month" : "months"}
                 </span>
               </>
@@ -148,14 +142,14 @@ export default function ForecastPage() {
             )}
           </div>
         </div>
-        <div className="rounded-2xl p-4" style={{ backgroundColor: "#1B2A4A" }}>
+        <div className="rounded-2xl p-4 bg-white shadow-sm border border-border">
           <div className="flex items-center gap-2 mb-2">
             <TrendingDown className="w-4 h-4 text-[hsl(217,70%,50%)]" />
-            <span className="text-[0.6875rem] uppercase tracking-wider text-slate-400 font-medium">
+            <span className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium">
               Total Interest
             </span>
           </div>
-          <div className="text-xl font-bold text-white">
+          <div className="text-xl font-bold text-[#1B2A4A]">
             {formatCurrency(forecast.totalInterestCustom, baseCurrency)}
           </div>
         </div>
@@ -173,7 +167,7 @@ export default function ForecastPage() {
               {formatCurrency(interestSaved, baseCurrency)} saved in interest
             </p>
             {monthsSaved > 0 && (
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 Debt-free {monthsSaved} {monthsSaved === 1 ? "month" : "months"} sooner
               </p>
             )}
@@ -183,30 +177,30 @@ export default function ForecastPage() {
 
       {/* Area Chart */}
       {chartData.length > 1 && (
-        <div className="rounded-2xl p-4" style={{ backgroundColor: "#1B2A4A" }}>
-          <p className="text-xs font-medium text-white mb-3">Total Debt Over Time</p>
+        <div className="rounded-2xl p-4 bg-white shadow-sm border border-border">
+          <p className="text-xs font-medium text-[#1B2A4A] mb-3">Total Debt Over Time</p>
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
               <defs>
                 <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(217, 70%, 50%)" stopOpacity={0.3} />
+                  <stop offset="0%" stopColor="hsl(217, 70%, 50%)" stopOpacity={0.2} />
                   <stop offset="100%" stopColor="hsl(217, 70%, 50%)" stopOpacity={0.02} />
                 </linearGradient>
                 <linearGradient id="minimumGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#64748B" stopOpacity={0.15} />
-                  <stop offset="100%" stopColor="#64748B" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor="#94A3B8" stopOpacity={0.12} />
+                  <stop offset="100%" stopColor="#94A3B8" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 10, fill: "#94A3B8" }}
+                tick={{ fontSize: 10, fill: "#64748B" }}
                 interval={tickInterval}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
                 tickFormatter={formatY}
-                tick={{ fontSize: 10, fill: "#94A3B8" }}
+                tick={{ fontSize: 10, fill: "#64748B" }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -218,15 +212,15 @@ export default function ForecastPage() {
                 contentStyle={{
                   fontSize: 12,
                   borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  background: "#0F172A",
-                  color: "#fff",
+                  border: "1px solid #E2E8F0",
+                  background: "#fff",
+                  color: "#1B2A4A",
                 }}
-                labelStyle={{ color: "#94A3B8" }}
+                labelStyle={{ color: "#64748B" }}
               />
               <ReferenceLine
                 y={0}
-                stroke="rgba(255,255,255,0.1)"
+                stroke="#E2E8F0"
                 strokeDasharray="4 4"
               />
               {/* Minimum payments line (muted) */}
@@ -235,7 +229,7 @@ export default function ForecastPage() {
                   type="monotone"
                   dataKey="minimum"
                   name="minimum"
-                  stroke="#64748B"
+                  stroke="#94A3B8"
                   strokeWidth={1.5}
                   strokeDasharray="6 3"
                   fill="url(#minimumGradient)"
@@ -257,12 +251,12 @@ export default function ForecastPage() {
           {extraMonthly > 0 && (
             <div className="flex items-center gap-4 mt-2 px-1">
               <div className="flex items-center gap-1.5">
-                <div className="w-4 h-0.5 bg-slate-500" style={{ borderTop: "1.5px dashed #64748B" }} />
-                <span className="text-[0.625rem] text-slate-400">Minimum</span>
+                <div className="w-4 h-0.5" style={{ borderTop: "1.5px dashed #94A3B8" }} />
+                <span className="text-[0.625rem] text-muted-foreground">Minimum</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: "hsl(217, 70%, 50%)" }} />
-                <span className="text-[0.625rem] text-slate-400">With extra</span>
+                <span className="text-[0.625rem] text-muted-foreground">With extra</span>
               </div>
             </div>
           )}
@@ -270,15 +264,15 @@ export default function ForecastPage() {
       )}
 
       {/* What-if Slider */}
-      <div className="rounded-2xl p-4" style={{ backgroundColor: "#1B2A4A" }}>
-        <label className="text-[0.6875rem] uppercase tracking-wider text-slate-400 font-medium block mb-3">
+      <div className="rounded-2xl p-4 bg-white shadow-sm border border-border">
+        <label className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground font-medium block mb-3">
           Extra monthly payment:{" "}
-          <span className="text-white font-semibold text-sm normal-case">
+          <span className="text-[#1B2A4A] font-semibold text-sm normal-case">
             {formatCurrency(extraMonthly, baseCurrency)}
           </span>
         </label>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-500">£0</span>
+          <span className="text-xs text-muted-foreground">£0</span>
           <input
             type="range"
             min={0}
@@ -288,26 +282,26 @@ export default function ForecastPage() {
             onChange={(e) => setExtraMonthly(Number(e.target.value))}
             className="flex-1 h-2 accent-[hsl(217,70%,50%)] rounded-full"
           />
-          <span className="text-xs text-slate-500">£500</span>
+          <span className="text-xs text-muted-foreground">£500</span>
         </div>
       </div>
 
       {/* Per-Account Breakdown */}
       {perAccountBreakdown.length > 0 && (
-        <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "#1B2A4A" }}>
+        <div className="rounded-2xl overflow-hidden bg-white shadow-sm border border-border">
           <button
             onClick={() => setBreakdownOpen((o) => !o)}
-            className="w-full flex items-center justify-between px-4 py-3.5 active:bg-white/5 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-3.5 active:bg-gray-50 transition-colors"
           >
-            <span className="text-sm font-medium text-white">Per-Account Breakdown</span>
+            <span className="text-sm font-medium text-[#1B2A4A]">Per-Account Breakdown</span>
             <ChevronDown
-              className={`w-4 h-4 text-slate-400 transition-transform ${
+              className={`w-4 h-4 text-muted-foreground transition-transform ${
                 breakdownOpen ? "rotate-180" : ""
               }`}
             />
           </button>
           {breakdownOpen && (
-            <div className="border-t border-white/5 divide-y divide-white/5">
+            <div className="border-t border-border divide-y divide-border">
               {perAccountBreakdown.map(({ account, payoffMonth, totalInterest, apr }) => {
                 const Icon = CATEGORY_ICONS[account.category] || CreditCard
                 const bgColor = getInstitutionColor(account.institution)
@@ -334,31 +328,31 @@ export default function ForecastPage() {
                         <Icon className="w-4 h-4 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">
+                        <p className="text-sm font-semibold text-[#1B2A4A] truncate">
                           {account.institution}
                         </p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-muted-foreground">
                           ••{account.last4} &middot; {apr.toFixed(1)}% APR
                         </p>
                       </div>
-                      <span className="text-sm font-semibold text-white tabular-nums">
+                      <span className="text-sm font-semibold text-[#1B2A4A] tabular-nums">
                         {formatCurrency(Math.abs(account.balance), account.currency)}
                       </span>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <p className="text-[0.625rem] uppercase tracking-wider text-slate-500 mb-0.5">
+                        <p className="text-[0.625rem] uppercase tracking-wider text-muted-foreground mb-0.5">
                           Payoff
                         </p>
-                        <p className="text-xs font-medium text-white">
+                        <p className="text-xs font-medium text-[#1B2A4A]">
                           {payoffDate ?? "5yr+"}
                         </p>
                       </div>
                       <div>
-                        <p className="text-[0.625rem] uppercase tracking-wider text-slate-500 mb-0.5">
+                        <p className="text-[0.625rem] uppercase tracking-wider text-muted-foreground mb-0.5">
                           Interest
                         </p>
-                        <p className="text-xs font-medium text-white">
+                        <p className="text-xs font-medium text-[#1B2A4A]">
                           {formatCurrency(totalInterest, account.currency)}
                         </p>
                       </div>
@@ -374,7 +368,7 @@ export default function ForecastPage() {
       {/* Strategy Tips */}
       {forecast.strategies.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 px-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
             Strategy Tips
           </p>
           {forecast.strategies.map((tip, i) => (
@@ -382,15 +376,15 @@ export default function ForecastPage() {
               key={i}
               className="rounded-2xl px-4 py-3.5"
               style={{
-                backgroundColor: "rgba(59, 130, 246, 0.08)",
+                backgroundColor: "rgba(59, 130, 246, 0.06)",
                 borderLeft: "3px solid hsl(217, 70%, 50%)",
               }}
             >
               <div className="flex items-center gap-2 mb-1">
                 <Zap className="w-3.5 h-3.5 text-[hsl(217,70%,50%)]" />
-                <span className="text-sm font-semibold text-white">{tip.title}</span>
+                <span className="text-sm font-semibold text-[#1B2A4A]">{tip.title}</span>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 {tip.description}
               </p>
               {tip.savingsEstimate !== null && tip.savingsEstimate > 0 && (

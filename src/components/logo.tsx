@@ -2,51 +2,37 @@
 
 interface LogoProps {
   size?: number
-  variant?: "light" | "dark"
   className?: string
 }
 
-export function Logo({ size = 32, variant = "dark", className }: LogoProps) {
-  const cardColor = variant === "dark" ? "#ffffff" : "#0A1628"
-  const pulseColor = variant === "dark" ? "#3b82f6" : "#3b82f6"
-
+export function Logo({ size = 32, className }: LogoProps) {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 512 512"
+      viewBox="0 0 48 48"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      {/* Card shape */}
-      <rect
-        x="56"
-        y="116"
-        width="400"
-        height="280"
-        rx="32"
-        fill={cardColor}
-        opacity="0.95"
-      />
-      {/* Chip rectangle */}
-      <rect
-        x="116"
-        y="166"
-        width="64"
-        height="48"
-        rx="8"
-        fill={pulseColor}
-        opacity="0.3"
-      />
-      {/* Heartbeat/pulse line */}
-      <polyline
-        points="56,296 156,296 196,216 256,356 316,236 356,296 456,296"
+      {/* Rounded square background */}
+      <rect width="48" height="48" rx="12" fill="#1B2A4A" />
+      {/* Stylised "C" + pulse line */}
+      <path
+        d="M28 14a12 12 0 1 0 0 20"
+        stroke="white"
+        strokeWidth="3"
+        strokeLinecap="round"
         fill="none"
-        stroke={pulseColor}
-        strokeWidth="26"
+      />
+      {/* Pulse/heartbeat line through the centre */}
+      <path
+        d="M10 24h8l3-6 4 12 3-6h10"
+        stroke="#3b82f6"
+        strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
+        fill="none"
       />
     </svg>
   )

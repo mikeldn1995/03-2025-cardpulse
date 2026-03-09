@@ -46,31 +46,31 @@ export default function MenuPage() {
             : "?"}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-white font-semibold text-base truncate">
+          <p className="text-[#1B2A4A] font-semibold text-base truncate">
             {userName || "User"}
           </p>
-          <p className="text-white/50 text-sm truncate">{userEmail}</p>
+          <p className="text-muted-foreground text-sm truncate">{userEmail}</p>
         </div>
       </div>
 
       {/* Menu items */}
-      <div className="bg-[#1B2A4A] rounded-2xl overflow-hidden">
+      <div className="bg-white shadow-sm border border-border rounded-2xl overflow-hidden">
         {MENU_ITEMS.map((item, i) => (
           <Link
             key={item.href}
             href={item.href}
-            className="flex items-center gap-4 px-4 py-4 active:bg-white/5 transition-colors"
+            className="flex items-center gap-4 px-4 py-4 active:bg-gray-50 transition-colors"
           >
-            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
               <item.icon className="w-5 h-5 text-[hsl(217,70%,50%)]" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-medium">{item.label}</p>
-              <p className="text-white/40 text-xs">{item.description}</p>
+              <p className="text-[#1B2A4A] text-sm font-medium">{item.label}</p>
+              <p className="text-muted-foreground text-xs">{item.description}</p>
             </div>
-            <ChevronRight className="w-4 h-4 text-white/20 shrink-0" />
+            <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
             {i < MENU_ITEMS.length - 1 && (
-              <div className="absolute left-[4.5rem] right-4 bottom-0 h-px bg-white/5" />
+              <div className="absolute left-[4.5rem] right-4 bottom-0 h-px bg-border" />
             )}
           </Link>
         ))}
@@ -79,7 +79,7 @@ export default function MenuPage() {
       {/* Logout */}
       <button
         onClick={handleLogout}
-        className="bg-[#1B2A4A] rounded-2xl flex items-center gap-4 px-4 py-4 active:bg-white/5 transition-colors w-full"
+        className="bg-white shadow-sm border border-border rounded-2xl flex items-center gap-4 px-4 py-4 active:bg-gray-50 transition-colors w-full"
       >
         <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
           <LogOut className="w-5 h-5 text-red-400" />
@@ -89,8 +89,8 @@ export default function MenuPage() {
 
       {/* App branding */}
       <div className="flex flex-col items-center gap-2 pt-4 pb-8">
-        <Logo size={24} variant="dark" />
-        <p className="text-white/20 text-xs">CardPulse v4.0</p>
+        <Logo size={24} />
+        <p className="text-gray-300 text-xs">CardPulse v4.0</p>
       </div>
     </div>
   )
